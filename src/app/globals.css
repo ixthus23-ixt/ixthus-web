@@ -1,0 +1,288 @@
+@import "tailwindcss";
+
+:root {
+  --background: #071a35;
+  --foreground: #ffffff;
+  --ink: #071a35;
+  --navy: #0d47a1;
+  --navy-soft: #2563eb;
+  --gold: #d9b76f;
+  --gold-soft: #f0d895;
+  --cream: #ffffff;
+  --warm: #dbeafe;
+  --font-outfit: "Outfit", "Poppins", "Montserrat", "Avenir Next", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-cream: var(--cream);
+  --color-warm: var(--warm);
+  --font-sans: var(--font-outfit);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-outfit), system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(217, 183, 111, 0.35);
+  color: #fff;
+}
+
+.section-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.cinematic-bg {
+  /* Hero image controls: adjust these when a future photo needs different framing. */
+  --hero-image: url("/images/hero/hero-main.jpg");
+  --hero-image-position: center 28%;
+  --hero-image-brightness: 0.75;
+  --hero-image-saturation: 0.85;
+  --hero-image-contrast: 1.05;
+  --hero-overlay-opacity: 0.47;
+  --hero-left-protection: 0.9;
+  background: #071a35;
+}
+
+.cinematic-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--hero-image);
+  background-position: var(--hero-image-position);
+  background-size: cover;
+  filter: brightness(var(--hero-image-brightness)) saturate(var(--hero-image-saturation)) contrast(var(--hero-image-contrast));
+  transform: scale(1.015);
+  transform-origin: center;
+}
+
+.hero-video-bg {
+  object-position: var(--hero-image-position);
+  filter: brightness(var(--hero-image-brightness)) saturate(var(--hero-image-saturation)) contrast(var(--hero-image-contrast));
+}
+
+.hero-blue-veil {
+  background:
+    linear-gradient(180deg, rgba(7, 26, 53, 0.16) 0%, rgba(7, 26, 53, 0.68) 100%),
+    linear-gradient(90deg, rgba(3, 12, 30, var(--hero-left-protection)) 0%, rgba(3, 12, 30, 0.66) 34%, rgba(3, 12, 30, 0.2) 62%, rgba(3, 12, 30, 0.1) 100%);
+  opacity: var(--hero-overlay-opacity);
+}
+
+.hero-global-dim {
+  background: rgba(3, 12, 30, 0.45);
+}
+
+.hero-light-field {
+  background:
+    radial-gradient(ellipse at 76% 18%, rgba(147, 197, 253, 0.18), transparent 45%),
+    radial-gradient(ellipse at 46% 102%, rgba(37, 99, 235, 0.12), transparent 48%),
+    linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.045) 48%, transparent 72%);
+  mix-blend-mode: screen;
+}
+
+.hero-particles {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.52) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(147, 197, 253, 0.34) 0 1px, transparent 1.5px);
+  background-position:
+    0 0,
+    28px 42px;
+  background-size:
+    86px 86px,
+    132px 132px;
+  mask-image: linear-gradient(90deg, transparent 0%, black 16%, black 84%, transparent 100%);
+  animation: particle-drift 24s linear infinite;
+}
+
+.hero-depth-orbit {
+  background:
+    radial-gradient(circle at 86% 54%, rgba(96, 165, 250, 0.1), transparent 26%),
+    radial-gradient(circle at 30% 22%, rgba(248, 250, 252, 0.08), transparent 18%),
+    radial-gradient(circle at 64% 82%, rgba(217, 183, 111, 0.06), transparent 24%);
+  filter: blur(0.2px);
+  mix-blend-mode: screen;
+  animation: depth-breathe 11s ease-in-out infinite alternate;
+}
+
+.hero-campus-lines {
+  background-image:
+    linear-gradient(118deg, transparent 0%, rgba(255, 255, 255, 0.075) 42%, transparent 58%),
+    linear-gradient(64deg, transparent 0%, rgba(147, 197, 253, 0.08) 50%, transparent 72%);
+  background-size:
+    760px 100%,
+    980px 100%;
+  background-position:
+    8% center,
+    74% center;
+  mask-image: linear-gradient(180deg, transparent 0%, black 26%, black 64%, transparent 100%);
+}
+
+.essence-bg {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(96, 165, 250, 0.2), transparent 34%),
+    radial-gradient(circle at 84% 70%, rgba(29, 78, 216, 0.24), transparent 38%),
+    linear-gradient(180deg, rgba(7, 26, 53, 1) 0%, rgba(6, 26, 51, 1) 14%, rgba(11, 42, 85, 1) 100%);
+}
+
+.essence-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(7, 26, 53, 1), rgba(7, 26, 53, 0) 20%),
+    radial-gradient(circle at 50% 0%, rgba(96, 165, 250, 0.16), transparent 34%);
+}
+
+.testimonials-bg {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(29, 78, 216, 0.24), transparent 36%),
+    radial-gradient(circle at 12% 88%, rgba(96, 165, 250, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(11, 42, 85, 1) 0%, rgba(6, 26, 51, 1) 46%, rgba(29, 78, 216, 0.7) 100%);
+}
+
+.testimonials-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(6, 26, 51, 0.92), rgba(6, 26, 51, 0) 18%, rgba(7, 26, 53, 0.84) 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(248, 250, 252, 0.08), transparent 40%);
+}
+
+.what-is-bg {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(96, 165, 250, 0.18), transparent 32%),
+    radial-gradient(circle at 88% 48%, rgba(29, 78, 216, 0.22), transparent 36%),
+    linear-gradient(180deg, rgba(7, 26, 53, 1) 0%, rgba(6, 26, 51, 1) 44%, rgba(11, 42, 85, 1) 100%);
+}
+
+.what-is-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(7, 26, 53, 0.96), rgba(7, 26, 53, 0) 18%),
+    radial-gradient(ellipse at 50% 0%, rgba(248, 250, 252, 0.08), transparent 42%);
+}
+
+.history-bg {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(29, 78, 216, 0.24), transparent 34%),
+    radial-gradient(circle at 86% 76%, rgba(96, 165, 250, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(11, 42, 85, 1) 0%, rgba(6, 26, 51, 1) 42%, rgba(7, 26, 53, 1) 100%);
+}
+
+.history-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(248, 250, 252, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(11, 42, 85, 0.82), rgba(7, 26, 53, 0) 24%, rgba(7, 26, 53, 0.9) 100%);
+}
+
+@keyframes particle-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-86px, -86px, 0);
+  }
+}
+
+@keyframes depth-breathe {
+  from {
+    opacity: 0.46;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0.82;
+    transform: scale(1.04) translate3d(-10px, 8px, 0);
+  }
+}
+
+@keyframes scroll-glow {
+  0% {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+
+  22% {
+    opacity: 1;
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(230%);
+    opacity: 0;
+  }
+}
+
+.scroll-light {
+  animation: scroll-glow 1.9s ease-in-out infinite;
+}
+
+.community-image-1 {
+  /* Reemplazar por fotografía real: public/images/community/encuentro-juvenil.jpg */
+  background-image: url("/images/community/encuentro-juvenil.jpg");
+}
+
+.community-image-2 {
+  /* Reemplazar por fotografía real: public/images/community/mision-y-camino.jpg */
+  background-image: url("/images/community/mision-y-camino.jpg");
+}
+
+.community-image-3 {
+  /* Reemplazar por fotografía real: public/images/community/amistad-en-comunidad.jpg */
+  background-image: url("/images/community/amistad-en-comunidad.jpg");
+}
+
+.community-image-4 {
+  /* Reemplazar por fotografía real: public/images/community/oracion-compartida.jpg */
+  background-image: url("/images/community/oracion-compartida.jpg");
+}
+
+.soft-border {
+  border: 1px solid rgba(219, 234, 254, 0.14);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.gold-line {
+  background: linear-gradient(90deg, transparent, rgba(217, 183, 111, 0.9), transparent);
+}
