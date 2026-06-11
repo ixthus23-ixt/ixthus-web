@@ -56,15 +56,26 @@ export function LocationsSection() {
                 {location.address}
               </p>
 
-              <Link
-                href={location.mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 px-5 text-sm font-bold text-cream transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
-              >
-                Ver en Google Maps
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
+              <div className="mt-auto grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <Link
+                  href={location.directionsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold px-5 text-sm font-bold text-ink transition hover:bg-gold-soft"
+                >
+                  Cómo llegar
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={location.mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 px-5 text-sm font-bold text-cream transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                >
+                  Ver en Google Maps
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </div>
             </MotionDiv>
           ))}
         </div>

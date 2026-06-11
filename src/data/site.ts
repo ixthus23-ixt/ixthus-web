@@ -4,6 +4,7 @@ import {
   Church,
   Compass,
   Flame,
+  GraduationCap,
   HandHeart,
   Heart,
   MessageCircleHeart,
@@ -30,7 +31,7 @@ export const heroContent = {
   title: "IXTHUS",
   slogan: "Hacer del mundo la Iglesia que Jesús soñó",
   description:
-    "Una comunidad juvenil católica donde jóvenes descubren a Cristo, viven su fe y transforman su entorno con amor, servicio y misión.",
+    "Somos una Pastoral Universitaria que evangeliza de joven a joven, formando comunidades centradas en Cristo, la oración, el servicio y la misión.",
   inspiration:
     "No nacimos para caminar solos. Fuimos llamados a caminar con Cristo y con nuestros hermanos.",
   emotionalCallout:
@@ -147,6 +148,12 @@ export const historyTimeline = [
     text: "Con el paso de los años, IXTHUS ha experimentado un crecimiento constante en su misión evangelizadora.\n\nLo que comenzó como una iniciativa juvenil en una comunidad parroquial ha evolucionado hasta consolidarse como un movimiento de Pastoral Juvenil Universitaria comprometido con la formación integral de los jóvenes y la construcción de la Iglesia que Jesús soñó.\n\nActualmente, IXTHUS tiene presencia en tres parroquias, fortaleciendo redes de comunidad, formación, servicio y evangelización entre jóvenes de distintos contextos, siempre con Cristo como centro de su camino.",
   },
 ];
+
+export const saintQuote = {
+  quote:
+    "Muchos no se hacen cristianos porque no hay quien los haga cristianos.",
+  author: "San Francisco Javier, Patrono de IXTHUS",
+};
 
 export const missionCards = [
   {
@@ -265,7 +272,7 @@ export const socialLinks = [
 
 export const footerContent = {
   description:
-    "Pastoral Juvenil Universitaria que evangeliza de joven a joven, caminando con Cristo en comunidad, oración, formación y misión.",
+    "Pastoral Universitaria que evangeliza de joven a joven, caminando con Cristo en comunidad, oración, formación y misión.",
   city: "Ciudad de México",
   email: "contacto@ixthus.org",
 };
@@ -285,23 +292,49 @@ export const locations = [
       "Calle Ote. 172 250, Moctezuma 2da Secc, Venustiano Carranza, 15530 Ciudad de México, CDMX.",
     mapsUrl:
       "https://maps.google.com/?q=Calle%20Ote.%20172%20250%2C%20Moctezuma%202da%20Secc%2C%20Venustiano%20Carranza%2C%2015530%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
+    directionsUrl:
+      "https://www.google.com/maps/dir/?api=1&destination=Calle%20Ote.%20172%20250%2C%20Moctezuma%202da%20Secc%2C%20Venustiano%20Carranza%2C%2015530%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
   },
   {
     name: "Divina Providencia",
     tag: "Comunidad IXTHUS",
-    text: "Una de las comunidades donde IXTHUS vive su misión evangelizadora.",
+    text: "Comunidad donde IXTHUS continúa viviendo su misión evangelizadora.",
     address:
       "Calle Ote. 168 93, Moctezuma 2da Secc, Venustiano Carranza, 15530 Ciudad de México, CDMX.",
     mapsUrl:
       "https://maps.google.com/?q=Calle%20Ote.%20168%2093%2C%20Moctezuma%202da%20Secc%2C%20Venustiano%20Carranza%2C%2015530%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
+    directionsUrl:
+      "https://www.google.com/maps/dir/?api=1&destination=Calle%20Ote.%20168%2093%2C%20Moctezuma%202da%20Secc%2C%20Venustiano%20Carranza%2C%2015530%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
   },
   {
     name: "Asunción de Nuestra Señora",
     tag: "Comunidad IXTHUS",
-    text: "Comunidad parroquial donde IXTHUS continúa creciendo y formando jóvenes.",
+    text: "Comunidad parroquial donde seguimos creciendo en fe, comunidad y servicio.",
     address:
       "Tacuba 12, Merced Gómez, Álvaro Obregón, 01600 Ciudad de México, CDMX.",
     mapsUrl:
       "https://maps.google.com/?q=Tacuba%2012%2C%20Merced%20G%C3%B3mez%2C%20%C3%81lvaro%20Obreg%C3%B3n%2C%2001600%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
+    directionsUrl:
+      "https://www.google.com/maps/dir/?api=1&destination=Tacuba%2012%2C%20Merced%20G%C3%B3mez%2C%20%C3%81lvaro%20Obreg%C3%B3n%2C%2001600%20Ciudad%20de%20M%C3%A9xico%2C%20CDMX",
   },
+];
+
+export const parishPresenceContent = {
+  eyebrow: "Presencia IXTHUS",
+  title: "Tres comunidades, una misma misión",
+  text: "IXTHUS tiene presencia en tres comunidades parroquiales, desde donde seguimos construyendo espacios de encuentro, formación, servicio y misión para jóvenes universitarios.",
+};
+
+export const integrationContent = {
+  eyebrow: "¿Dónde puedo integrarme?",
+  title: "Tu lugar puede estar aquí",
+  text: "No importa si llevas años caminando en la fe o si apenas estás comenzando. En IXTHUS queremos caminar contigo, acompañarte y ayudarte a descubrir el lugar que Dios ha preparado para ti.",
+  button: "Quiero formar parte de IXTHUS",
+};
+
+export const integrationPoints = [
+  { title: "Soy universitario", icon: GraduationCap },
+  { title: "Quiero acercarme más a Cristo", icon: Church },
+  { title: "Busco una comunidad", icon: Users },
+  { title: "Quiero servir y crecer en la fe", icon: HandHeart },
 ];
