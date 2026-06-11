@@ -42,6 +42,13 @@ public/images/community/encuentro-juvenil.jpg
 public/images/community/mision-y-camino.jpg
 public/images/community/amistad-en-comunidad.jpg
 public/images/community/oracion-compartida.jpg
+public/images/parishes/san-pio-decimo.jpg
+public/images/parishes/divina-providencia.jpg
+public/images/parishes/asuncion-de-nuestra-senora.jpg
 ```
 
 La carpeta `public/images/events/` queda preparada para futuras fotografías de eventos.
+
+Las fotografías de `public/images/parishes/` deben mostrar fachada, templo,
+altar o elementos arquitectónicos representativos de cada parroquia. Evita usar
+fotografías de grupos juveniles o actividades para esas tres imágenes.

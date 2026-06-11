@@ -25,9 +25,12 @@ export function LocationsSection() {
             Encuentra una comunidad IXTHUS cerca de ti
           </h2>
           <p className="mt-5 text-base leading-8 text-blue-100 sm:text-lg">
-            IXTHUS tiene presencia en tres parroquias de Ciudad de México,
-            donde jóvenes se reúnen para vivir la fe en comunidad, oración,
-            formación y misión.
+            IXTHUS tiene presencia en comunidades parroquiales de la
+            Arquidiócesis Primada de México, donde jóvenes universitarios
+            encuentran espacios de formación, oración, servicio y misión.
+          </p>
+          <p className="mt-4 text-sm font-bold uppercase tracking-[0.2em] text-[#D4AF37]">
+            Presencia actual en la Arquidiócesis Primada de México
           </p>
         </MotionDiv>
 
@@ -36,45 +39,60 @@ export function LocationsSection() {
             <MotionDiv
               key={location.name}
               variants={fadeUp}
-              className="group flex min-h-[360px] flex-col rounded-3xl border border-blue-200/18 bg-white/[0.085] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-[#D4AF37]/40 hover:bg-white/[0.12]"
+              className={`group flex min-h-[560px] flex-col overflow-hidden rounded-3xl border bg-white/[0.085] shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/[0.12] ${
+                location.tag === "Sede principal"
+                  ? "border-[#D4AF37]/40 ring-1 ring-[#D4AF37]/20"
+                  : "border-blue-200/18 hover:border-[#D4AF37]/40"
+              }`}
             >
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div className="grid h-13 w-13 shrink-0 place-items-center rounded-2xl border border-[#60A5FA]/20 bg-[#60A5FA]/14 text-[#93C5FD] transition group-hover:border-[#D4AF37]/35 group-hover:bg-[#D4AF37]/12 group-hover:text-[#D4AF37]">
+              <div className="relative min-h-[210px] overflow-hidden">
+                <div
+                  aria-label={location.imageAlt}
+                  role="img"
+                  className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${location.image})` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#061A33] via-[#061A33]/42 to-transparent" />
+                <div className="absolute left-5 top-5 grid h-12 w-12 place-items-center rounded-2xl border border-white/16 bg-[#061A33]/58 text-[#93C5FD] backdrop-blur-md transition group-hover:text-[#D4AF37]">
                   <MapPin className="h-6 w-6 stroke-[2.4]" />
                 </div>
-                <span className="rounded-full border border-[#D4AF37]/24 bg-[#D4AF37]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#D4AF37]">
+                <span className="absolute bottom-5 left-5 rounded-full border border-[#D4AF37]/28 bg-[#061A33]/70 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#D4AF37] backdrop-blur">
                   {location.tag}
                 </span>
               </div>
 
-              <h3 className="text-2xl font-extrabold text-[#F8FAFC]">
-                {location.name}
-              </h3>
-              <p className="mt-4 leading-7 text-blue-100/90">{location.text}</p>
-              <div className="mt-6 h-px w-16 bg-gradient-to-r from-[#D4AF37]/80 to-transparent transition group-hover:w-24" />
-              <p className="mt-5 text-sm font-medium leading-6 text-blue-50/82">
-                {location.address}
-              </p>
+              <div className="flex flex-1 flex-col p-7">
+                <h3 className="text-2xl font-extrabold text-[#F8FAFC]">
+                  {location.name}
+                </h3>
+                <p className="mt-4 leading-7 text-blue-100/90">
+                  {location.text}
+                </p>
+                <div className="mt-6 h-px w-16 bg-gradient-to-r from-[#D4AF37]/80 to-transparent transition group-hover:w-24" />
+                <p className="mt-5 text-sm font-medium leading-6 text-blue-50/82">
+                  {location.address}
+                </p>
 
-              <div className="mt-auto grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <Link
-                  href={location.directionsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold px-5 text-sm font-bold text-ink transition hover:bg-gold-soft"
-                >
-                  Cómo llegar
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href={location.mapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 px-5 text-sm font-bold text-cream transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
-                >
-                  Ver en Google Maps
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
+                <div className="mt-auto grid gap-3 pt-7 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <Link
+                    href={location.directionsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold px-5 text-sm font-bold text-ink transition hover:bg-gold-soft"
+                  >
+                    Cómo llegar
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href={location.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 px-5 text-sm font-bold text-cream transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                  >
+                    Ver en Google Maps
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             </MotionDiv>
           ))}

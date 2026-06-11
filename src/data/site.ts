@@ -273,6 +273,8 @@ export const socialLinks = [
 export const footerContent = {
   description:
     "Pastoral Universitaria que evangeliza de joven a joven, caminando con Cristo en comunidad, oración, formación y misión.",
+  institutional:
+    "Pastoral Universitaria con presencia en parroquias de la Arquidiócesis Primada de México.",
   city: "Ciudad de México",
   email: "contacto@ixthus.org",
 };
@@ -288,6 +290,8 @@ export const locations = [
     name: "San Pío Décimo",
     tag: "Sede principal",
     text: "Comunidad donde nació IXTHUS y punto principal de encuentro.",
+    image: "/images/parishes/san-pio-decimo.jpg",
+    imageAlt: "Fotografía de la parroquia San Pío Décimo",
     address:
       "Calle Ote. 172 250, Moctezuma 2da Secc, Venustiano Carranza, 15530 Ciudad de México, CDMX.",
     mapsUrl:
@@ -299,6 +303,8 @@ export const locations = [
     name: "Divina Providencia",
     tag: "Comunidad IXTHUS",
     text: "Comunidad donde IXTHUS continúa viviendo su misión evangelizadora.",
+    image: "/images/parishes/divina-providencia.jpg",
+    imageAlt: "Fotografía de la parroquia Divina Providencia",
     address:
       "Calle Ote. 168 93, Moctezuma 2da Secc, Venustiano Carranza, 15530 Ciudad de México, CDMX.",
     mapsUrl:
@@ -310,6 +316,8 @@ export const locations = [
     name: "Asunción de Nuestra Señora",
     tag: "Comunidad IXTHUS",
     text: "Comunidad parroquial donde seguimos creciendo en fe, comunidad y servicio.",
+    image: "/images/parishes/asuncion-de-nuestra-senora.jpg",
+    imageAlt: "Fotografía de la parroquia Asunción de Nuestra Señora",
     address:
       "Tacuba 12, Merced Gómez, Álvaro Obregón, 01600 Ciudad de México, CDMX.",
     mapsUrl:
@@ -322,7 +330,9 @@ export const locations = [
 export const parishPresenceContent = {
   eyebrow: "Presencia IXTHUS",
   title: "Tres comunidades, una misma misión",
-  text: "IXTHUS tiene presencia en tres comunidades parroquiales, desde donde seguimos construyendo espacios de encuentro, formación, servicio y misión para jóvenes universitarios.",
+  text: "IXTHUS tiene presencia en comunidades parroquiales de la Arquidiócesis Primada de México, donde jóvenes universitarios encuentran espacios de formación, oración, servicio y misión.",
+  institutionalLine:
+    "Presencia actual en la Arquidiócesis Primada de México",
 };
 
 export const integrationContent = {
