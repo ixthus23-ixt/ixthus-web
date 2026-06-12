@@ -28,6 +28,79 @@ src/data/site.ts
 
 El formulario de "Primer paso" está preparado como placeholder para conectarse después a un backend, Google Forms o WhatsApp.
 
+## Kerigma 2026
+
+El módulo de pre-registro vive en:
+
+```txt
+src/app/kerigma-2026/page.tsx
+src/app/admin/kerigma-2026/page.tsx
+src/lib/firebase.ts
+src/lib/admin.ts
+src/lib/kerigma.ts
+```
+
+Rutas:
+
+```txt
+/kerigma-2026
+/admin/kerigma-2026
+```
+
+Los correos administradores del panel se editan en:
+
+```txt
+src/lib/admin.ts
+```
+
+## Firebase
+
+Crea un proyecto en Firebase, habilita Authentication con email y contraseña, y crea una base de datos de Firestore.
+
+Variables de entorno requeridas en local y en Vercel:
+
+```txt
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+```
+
+En local puedes colocarlas en `.env.local`.
+
+Colección utilizada:
+
+```txt
+kerigma2026_pre_registros
+```
+
+Reglas sugeridas de Firestore:
+
+```txt
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /kerigma2026_pre_registros/{registroId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
+```
+
+Para que un administrador tenga acceso real en Firestore, crea un documento en
+`admins/{uid}` usando el UID del usuario de Firebase Auth. La lista
+`ADMIN_EMAILS` en `src/lib/admin.ts` controla el acceso visual al panel; las
+reglas anteriores protegen la lectura y edición de los datos.
+
 ## Fotografías reales
 
 Coloca tus imágenes reales respetando estos nombres para no modificar código:

@@ -23,6 +23,7 @@ export const navItems = [
   { label: "Comunidad", href: "#comunidad" },
   { label: "Oración", href: "#oracion" },
   { label: "Ubícanos", href: "#ubicanos" },
+  { label: "Kerigma 2026", href: "/kerigma-2026" },
   { label: "Contacto", href: "#contacto" },
 ];
 
