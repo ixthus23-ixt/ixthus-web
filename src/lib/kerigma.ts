@@ -1,5 +1,7 @@
 export const KERIGMA_COLLECTION = "kerigma2026_pre_registros";
 
+export const KERIGMA_COSTO = 800;
+
 export const PARROQUIAS = [
   "San Pío Décimo",
   "Divina Providencia",
@@ -62,6 +64,32 @@ export function getWhatsAppUrl(phone: string) {
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(
     WHATSAPP_MESSAGE,
   )}`;
+}
+
+export function getMontoAbonado(registration: Pick<KerigmaRegistration, "estadoPago" | "montoApartado">) {
+  if (registration.estadoPago === "pagado") {
+    return KERIGMA_COSTO;
+  }
+
+  if (registration.estadoPago === "apartado") {
+    return Math.max(0, Number(registration.montoApartado) || 0);
+  }
+
+  return 0;
+}
+
+export function getSaldoPendiente(
+  registration: Pick<KerigmaRegistration, "estadoPago" | "montoApartado">,
+) {
+  return Math.max(0, KERIGMA_COSTO - getMontoAbonado(registration));
+}
+
+export function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 export function formatRegistrationDate(

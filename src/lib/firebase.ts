@@ -12,14 +12,37 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
 };
 
-export const firebaseApp = getApps().length
-  ? getApp()
-  : initializeApp(firebaseConfig);
+export function isFirebaseConfigured() {
+  const valuesArePresent = Object.values(firebaseConfig).every((value) => {
+    const normalizedValue = value.trim().toLowerCase();
+
+    return (
+      normalizedValue.length > 0 &&
+      normalizedValue !== "undefined" &&
+      normalizedValue !== "null"
+    );
+  });
+
+  return (
+    valuesArePresent &&
+    firebaseConfig.apiKey.startsWith("AIza") &&
+    firebaseConfig.authDomain.includes(".firebaseapp.com") &&
+    firebaseConfig.appId.includes(":")
+  );
+}
+
+export function getFirebaseApp() {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured.");
+  }
+
+  return getApps().length ? getApp() : initializeApp(firebaseConfig);
+}
 
 export function getFirebaseAuth() {
-  return getAuth(firebaseApp);
+  return getAuth(getFirebaseApp());
 }
 
 export function getFirebaseDb() {
-  return getFirestore(firebaseApp);
+  return getFirestore(getFirebaseApp());
 }

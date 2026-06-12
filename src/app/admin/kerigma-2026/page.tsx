@@ -16,22 +16,35 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import {
+  BarChart3,
   CheckCircle2,
+  CircleDollarSign,
+  ClipboardList,
+  Clock3,
   Loader2,
   LogOut,
   MessageCircle,
   Pencil,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { isAdminEmail } from "@/lib/admin";
-import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
+import {
+  getFirebaseAuth,
+  getFirebaseDb,
+  isFirebaseConfigured,
+} from "@/lib/firebase";
 import {
   ESTADOS_PAGO,
+  formatCurrency,
   formatRegistrationDate,
+  getMontoAbonado,
+  getSaldoPendiente,
   getWhatsAppUrl,
   KERIGMA_COLLECTION,
+  KERIGMA_COSTO,
   PARROQUIAS,
   SEXOS,
   type EstadoPago,
@@ -46,11 +59,53 @@ type Filters = {
   estadoPago: "todos" | EstadoPago;
 };
 
+type AdminTab = "registros" | "detalles" | "pagos";
+
 const initialFilters: Filters = {
   parroquia: "todos",
   sexo: "todos",
   estadoPago: "todos",
 };
+
+const parishStyles: Record<
+  Parroquia,
+  {
+    accent: string;
+    bar: string;
+    glow: string;
+  }
+> = {
+  "San Pío Décimo": {
+    accent: "text-[#D4AF37]",
+    bar: "from-[#D4AF37] to-[#F0D895]",
+    glow: "shadow-[0_18px_56px_rgba(212,175,55,0.16)]",
+  },
+  "Divina Providencia": {
+    accent: "text-sky-200",
+    bar: "from-sky-300 to-blue-400",
+    glow: "shadow-[0_18px_56px_rgba(125,211,252,0.14)]",
+  },
+  "Asunción de Nuestra Señora": {
+    accent: "text-violet-200",
+    bar: "from-violet-300 to-fuchsia-300",
+    glow: "shadow-[0_18px_56px_rgba(196,181,253,0.14)]",
+  },
+  Otra: {
+    accent: "text-slate-200",
+    bar: "from-slate-300 to-slate-500",
+    glow: "shadow-[0_18px_56px_rgba(148,163,184,0.12)]",
+  },
+};
+
+const tabs: Array<{
+  id: AdminTab;
+  label: string;
+  icon: typeof ClipboardList;
+}> = [
+  { id: "registros", label: "Registros", icon: ClipboardList },
+  { id: "detalles", label: "Detalles de inscripciones", icon: BarChart3 },
+  { id: "pagos", label: "Pagos e ingresos", icon: CircleDollarSign },
+];
 
 export default function AdminKerigmaPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -58,23 +113,43 @@ export default function AdminKerigmaPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [firebaseConfigError, setFirebaseConfigError] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [registrations, setRegistrations] = useState<KerigmaRegistration[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [activeTab, setActiveTab] = useState<AdminTab>("registros");
 
   const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
-    return onAuthStateChanged(getFirebaseAuth(), (nextUser) => {
-      setUser(nextUser);
+    if (!isFirebaseConfigured()) {
+      setFirebaseConfigError(true);
       setAuthLoading(false);
-    });
+      return;
+    }
+
+    try {
+      const unsubscribe = onAuthStateChanged(getFirebaseAuth(), (nextUser) => {
+        setUser(nextUser);
+        setAuthLoading(false);
+      });
+
+      return unsubscribe;
+    } catch {
+      setFirebaseConfigError(true);
+      setAuthLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     if (!user || !isAdmin) {
       setRegistrations([]);
+      return;
+    }
+
+    if (!isFirebaseConfigured()) {
+      setDataLoading(false);
       return;
     }
 
@@ -118,28 +193,54 @@ export default function AdminKerigmaPage() {
   }, [filters, registrations]);
 
   const stats = useMemo(() => {
-    const paidOrReserved = registrations.filter((registration) =>
-      ["apartado", "pagado"].includes(registration.estadoPago),
+    const total = registrations.length;
+    const paid = registrations.filter(
+      (registration) => registration.estadoPago === "pagado",
+    );
+    const reserved = registrations.filter(
+      (registration) => registration.estadoPago === "apartado",
+    );
+    const pending = registrations.filter(
+      (registration) => registration.estadoPago === "pendiente",
+    );
+    const confirmed = registrations.filter(
+      (registration) => registration.confirmado,
+    );
+    const totalIncome = registrations.reduce(
+      (totalAmount, registration) => totalAmount + getMontoAbonado(registration),
+      0,
+    );
+    const pendingBalance = registrations.reduce(
+      (totalAmount, registration) =>
+        totalAmount + getSaldoPendiente(registration),
+      0,
     );
 
     return {
-      total: registrations.length,
-      byParish: PARROQUIAS.map((parroquia) => ({
-        label: parroquia,
-        value: registrations.filter(
+      total,
+      byParish: PARROQUIAS.map((parroquia) => {
+        const value = registrations.filter(
           (registration) => registration.parroquia === parroquia,
-        ).length,
-      })),
+        ).length;
+
+        return {
+          label: parroquia,
+          value,
+          percentage: total > 0 ? Math.round((value / total) * 100) : 0,
+        };
+      }),
       bySex: SEXOS.map((sexo) => ({
         label: sexo,
         value: registrations.filter((registration) => registration.sexo === sexo)
           .length,
       })),
-      paidOrReserved: paidOrReserved.length,
-      totalReserved: registrations.reduce(
-        (total, registration) => total + (Number(registration.montoApartado) || 0),
-        0,
-      ),
+      confirmed: confirmed.length,
+      pending: pending.length,
+      reserved: reserved.length,
+      paid: paid.length,
+      totalIncome,
+      pendingBalance,
+      fullRegistrationValue: total * KERIGMA_COSTO,
     };
   }, [registrations]);
 
@@ -149,6 +250,10 @@ export default function AdminKerigmaPage() {
     setIsLoggingIn(true);
 
     try {
+      if (!isFirebaseConfigured()) {
+        throw new Error("Firebase is not configured.");
+      }
+
       await signInWithEmailAndPassword(
         getFirebaseAuth(),
         loginEmail,
@@ -173,7 +278,7 @@ export default function AdminKerigmaPage() {
 
   async function editAmount(registration: KerigmaRegistration) {
     const value = window.prompt(
-      "Monto apartado",
+      "Monto abonado",
       String(registration.montoApartado ?? 0),
     );
 
@@ -188,7 +293,10 @@ export default function AdminKerigmaPage() {
       return;
     }
 
-    await updateRegistration(registration.id, { montoApartado: amount });
+    await updateRegistration(registration.id, {
+      montoApartado: Math.min(amount, KERIGMA_COSTO),
+      estadoPago: amount >= KERIGMA_COSTO ? "pagado" : "apartado",
+    });
   }
 
   async function editNotes(registration: KerigmaRegistration) {
@@ -203,6 +311,28 @@ export default function AdminKerigmaPage() {
 
   if (authLoading) {
     return <CenteredStatus text="Cargando acceso administrativo..." />;
+  }
+
+  if (!isFirebaseConfigured() || firebaseConfigError) {
+    return (
+      <AdminShell>
+        <div className="mx-auto max-w-xl rounded-[2rem] border border-[#D4AF37]/24 bg-[#D4AF37]/10 p-8 text-center text-blue-50 backdrop-blur-xl">
+          <h1 className="text-3xl font-black text-white">
+            Configuración de Firebase pendiente
+          </h1>
+          <p className="mt-4 leading-7 text-blue-100">
+            Agrega las variables de entorno de Firebase en `.env.local` para
+            activar el login administrativo y la lectura de registros.
+          </p>
+          <Link
+            href="/kerigma-2026"
+            className="mt-7 inline-flex rounded-full border border-white/15 px-6 py-3 font-bold text-white transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+          >
+            Volver al pre-registro
+          </Link>
+        </div>
+      </AdminShell>
+    );
   }
 
   if (!user) {
@@ -302,8 +432,8 @@ export default function AdminKerigmaPage() {
               Panel Kerigma 2026
             </h1>
             <p className="mt-3 max-w-2xl leading-7 text-blue-100">
-              Consulta, filtra y acompaña los pre-registros del Retiro
-              Kerigmático IXTHUS 2026.
+              Dashboard de seguimiento para pre-registros, confirmaciones y
+              pagos del Retiro Kerigmático IXTHUS 2026.
             </p>
           </div>
           <button
@@ -315,108 +445,176 @@ export default function AdminKerigmaPage() {
           </button>
         </header>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard label="Total inscritos" value={stats.total} />
-          <StatCard label="Apartado o pagado" value={stats.paidOrReserved} />
-          <StatCard
-            label="Monto total apartado"
-            value={`$${stats.totalReserved.toLocaleString("es-MX")}`}
-          />
-          {stats.bySex.map((item) => (
-            <StatCard
-              key={item.label}
-              label={item.label === "Hombre" ? "Hombres" : "Mujeres"}
-              value={item.value}
-            />
-          ))}
-        </section>
-
-        <section className="mt-5 grid gap-4 lg:grid-cols-4">
+        <section className="mt-8 grid gap-4 lg:grid-cols-4">
           {stats.byParish.map((item) => (
-            <StatCard key={item.label} label={item.label} value={item.value} />
+            <ParishMetricCard
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              percentage={item.percentage}
+            />
           ))}
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-white/12 bg-white/[0.07] p-5 backdrop-blur-xl">
-          <div className="grid gap-4 md:grid-cols-3">
-            <SelectFilter
-              label="Parroquia"
-              value={filters.parroquia}
-              onChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  parroquia: value as Filters["parroquia"],
-                }))
-              }
-              options={PARROQUIAS}
-            />
-            <SelectFilter
-              label="Sexo"
-              value={filters.sexo}
-              onChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  sexo: value as Filters["sexo"],
-                }))
-              }
-              options={SEXOS}
-            />
-            <SelectFilter
-              label="Estado de pago"
-              value={filters.estadoPago}
-              onChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  estadoPago: value as Filters["estadoPago"],
-                }))
-              }
-              options={ESTADOS_PAGO}
-            />
-          </div>
-        </section>
+        <nav className="mt-8 overflow-x-auto rounded-[1.75rem] border border-white/12 bg-white/[0.07] p-2 backdrop-blur-xl">
+          <div className="flex min-w-max gap-2">
+            {tabs.map((tabItem) => {
+              const Icon = tabItem.icon;
+              const isActive = activeTab === tabItem.id;
 
-        <section className="mt-8 overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.07] shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
-            <h2 className="text-xl font-black text-white">Registros</h2>
-            <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-bold text-blue-100">
-              {filteredRegistrations.length} visibles
-            </span>
+              return (
+                <button
+                  key={tabItem.id}
+                  type="button"
+                  onClick={() => setActiveTab(tabItem.id)}
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-black transition ${
+                    isActive
+                      ? "bg-[#D4AF37] text-[#061A33]"
+                      : "text-blue-100 hover:bg-white/8 hover:text-white"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tabItem.label}
+                </button>
+              );
+            })}
           </div>
+        </nav>
 
-          {dataLoading ? (
-            <div className="flex min-h-52 items-center justify-center gap-3 text-blue-100">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Cargando registros
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1180px] text-left text-sm">
-                <thead className="bg-[#061A33]/70 text-xs uppercase tracking-[0.12em] text-blue-100">
-                  <tr>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Edad</TableHead>
-                    <TableHead>Sexo</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Parroquia</TableHead>
-                    <TableHead>Estado de pago</TableHead>
-                    <TableHead>Monto apartado</TableHead>
-                    <TableHead>Confirmado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRegistrations.map((registration) => (
+        {activeTab === "registros" ? (
+          <RecordsTab
+            dataLoading={dataLoading}
+            filteredRegistrations={filteredRegistrations}
+            filters={filters}
+            setFilters={setFilters}
+            updateRegistration={updateRegistration}
+            editAmount={editAmount}
+            editNotes={editNotes}
+          />
+        ) : null}
+
+        {activeTab === "detalles" ? <DetailsTab stats={stats} /> : null}
+
+        {activeTab === "pagos" ? <PaymentsTab stats={stats} /> : null}
+      </div>
+    </AdminShell>
+  );
+}
+
+function RecordsTab({
+  dataLoading,
+  filteredRegistrations,
+  filters,
+  setFilters,
+  updateRegistration,
+  editAmount,
+  editNotes,
+}: {
+  dataLoading: boolean;
+  filteredRegistrations: KerigmaRegistration[];
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  updateRegistration: (
+    id: string,
+    data: Partial<KerigmaRegistration>,
+  ) => Promise<void>;
+  editAmount: (registration: KerigmaRegistration) => Promise<void>;
+  editNotes: (registration: KerigmaRegistration) => Promise<void>;
+}) {
+  return (
+    <>
+      <section className="mt-8 rounded-[2rem] border border-white/12 bg-white/[0.07] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.16)] backdrop-blur-xl">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-white">Registros</h2>
+            <p className="mt-1 text-sm leading-6 text-blue-100/78">
+              Filtra por comunidad, sexo y estado de pago para coordinar el
+              seguimiento después de misa.
+            </p>
+          </div>
+          <span className="w-fit rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-bold text-blue-100">
+            {filteredRegistrations.length} visibles
+          </span>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <SelectFilter
+            label="Parroquia"
+            value={filters.parroquia}
+            onChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                parroquia: value as Filters["parroquia"],
+              }))
+            }
+            options={PARROQUIAS}
+          />
+          <SelectFilter
+            label="Sexo"
+            value={filters.sexo}
+            onChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                sexo: value as Filters["sexo"],
+              }))
+            }
+            options={SEXOS}
+          />
+          <SelectFilter
+            label="Estado de pago"
+            value={filters.estadoPago}
+            onChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                estadoPago: value as Filters["estadoPago"],
+              }))
+            }
+            options={ESTADOS_PAGO}
+          />
+        </div>
+      </section>
+
+      <section className="mt-8 overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.07] shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+        {dataLoading ? (
+          <div className="flex min-h-52 items-center justify-center gap-3 text-blue-100">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Cargando registros
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[1500px] border-separate border-spacing-0 text-left text-sm">
+              <thead className="bg-[#061A33]/78 text-xs uppercase tracking-[0.12em] text-blue-100">
+                <tr>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Edad</TableHead>
+                  <TableHead>Sexo</TableHead>
+                  <TableHead>Teléfono</TableHead>
+                  <TableHead>Parroquia</TableHead>
+                  <TableHead>Estado de pago</TableHead>
+                  <TableHead>Costo total</TableHead>
+                  <TableHead>Monto abonado</TableHead>
+                  <TableHead>Saldo pendiente</TableHead>
+                  <TableHead>Confirmado</TableHead>
+                  <TableHead>Fecha de registro</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRegistrations.map((registration) => {
+                  const amountPaid = getMontoAbonado(registration);
+                  const pendingBalance = getSaldoPendiente(registration);
+
+                  return (
                     <tr
                       key={registration.id}
-                      className="border-t border-white/10 text-blue-50/90"
+                      className="border-t border-white/10 text-blue-50/90 transition hover:bg-white/[0.045]"
                     >
                       <TableCell>
-                        <div className="font-bold text-white">
+                        <div className="font-black text-white">
                           {registration.nombre}
                         </div>
                         {registration.notas ? (
-                          <div className="mt-1 max-w-[220px] truncate text-xs text-blue-200">
+                          <div className="mt-1 max-w-[240px] truncate text-xs font-medium text-blue-200/82">
                             {registration.notas}
                           </div>
                         ) : null}
@@ -446,8 +644,23 @@ export default function AdminKerigmaPage() {
                             </option>
                           ))}
                         </select>
+                        <div className="mt-2">
+                          <PaymentBadge status={registration.estadoPago} />
+                        </div>
                       </TableCell>
-                      <TableCell>${registration.montoApartado ?? 0}</TableCell>
+                      <TableCell>{formatCurrency(KERIGMA_COSTO)}</TableCell>
+                      <TableCell>{formatCurrency(amountPaid)}</TableCell>
+                      <TableCell>
+                        <span
+                          className={
+                            pendingBalance === 0
+                              ? "font-black text-emerald-200"
+                              : "font-black text-amber-200"
+                          }
+                        >
+                          {formatCurrency(pendingBalance)}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <button
                           onClick={() =>
@@ -455,10 +668,10 @@ export default function AdminKerigmaPage() {
                               confirmado: !registration.confirmado,
                             })
                           }
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-2 font-bold ${
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-2 font-bold transition ${
                             registration.confirmado
-                              ? "bg-emerald-400/14 text-emerald-200"
-                              : "bg-white/8 text-blue-100"
+                              ? "bg-emerald-400/14 text-emerald-200 hover:bg-emerald-400/22"
+                              : "bg-white/8 text-blue-100 hover:bg-white/12"
                           }`}
                         >
                           <CheckCircle2 className="h-4 w-4" />
@@ -490,7 +703,7 @@ export default function AdminKerigmaPage() {
                           </ActionButton>
                           <ActionButton onClick={() => editAmount(registration)}>
                             <Pencil className="h-3.5 w-3.5" />
-                            Monto
+                            Editar abono
                           </ActionButton>
                           <ActionButton onClick={() => editNotes(registration)}>
                             Notas
@@ -507,14 +720,137 @@ export default function AdminKerigmaPage() {
                         </div>
                       </TableCell>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function DetailsTab({
+  stats,
+}: {
+  stats: {
+    total: number;
+    bySex: Array<{ label: Sexo; value: number }>;
+    confirmed: number;
+    pending: number;
+    reserved: number;
+    paid: number;
+  };
+}) {
+  const men = stats.bySex.find((item) => item.label === "Hombre")?.value ?? 0;
+  const women = stats.bySex.find((item) => item.label === "Mujer")?.value ?? 0;
+
+  return (
+    <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard icon={Users} label="Total inscritos" value={stats.total} />
+      <StatCard icon={Users} label="Hombres" value={men} tone="blue" />
+      <StatCard icon={Users} label="Mujeres" value={women} tone="violet" />
+      <StatCard
+        icon={CheckCircle2}
+        label="Confirmados"
+        value={stats.confirmed}
+        tone="green"
+      />
+      <StatCard
+        icon={Clock3}
+        label="Pendientes"
+        value={stats.pending}
+        tone="orange"
+      />
+      <StatCard
+        icon={CircleDollarSign}
+        label="Apartados"
+        value={stats.reserved}
+        tone="gold"
+      />
+      <StatCard
+        icon={CheckCircle2}
+        label="Pagados"
+        value={stats.paid}
+        tone="green"
+      />
+    </section>
+  );
+}
+
+function PaymentsTab({
+  stats,
+}: {
+  stats: {
+    paid: number;
+    reserved: number;
+    pending: number;
+    totalIncome: number;
+    pendingBalance: number;
+    fullRegistrationValue: number;
+  };
+}) {
+  return (
+    <section className="mt-8 grid gap-4 lg:grid-cols-3">
+      <StatCard
+        icon={CircleDollarSign}
+        label="Costo por inscripción"
+        value={formatCurrency(KERIGMA_COSTO)}
+        tone="gold"
+      />
+      <StatCard
+        icon={CircleDollarSign}
+        label="Monto total de inscripciones"
+        value={formatCurrency(stats.totalIncome)}
+        tone="green"
+      />
+      <StatCard
+        icon={Clock3}
+        label="Saldo pendiente total"
+        value={formatCurrency(stats.pendingBalance)}
+        tone="orange"
+      />
+      <StatCard
+        icon={CheckCircle2}
+        label="Total pagados"
+        value={stats.paid}
+        tone="green"
+      />
+      <StatCard
+        icon={CircleDollarSign}
+        label="Total apartados"
+        value={stats.reserved}
+        tone="gold"
+      />
+      <StatCard
+        icon={Clock3}
+        label="Total pendientes"
+        value={stats.pending}
+        tone="orange"
+      />
+      <div className="rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl lg:col-span-3">
+        <p className="text-sm font-bold text-blue-100">
+          Valor completo si todos liquidan
+        </p>
+        <p className="mt-3 text-4xl font-black text-white">
+          {formatCurrency(stats.fullRegistrationValue)}
+        </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#D4AF37] to-emerald-300"
+            style={{
+              width:
+                stats.fullRegistrationValue > 0
+                  ? `${Math.round(
+                      (stats.totalIncome / stats.fullRegistrationValue) * 100,
+                    )}%`
+                  : "0%",
+            }}
+          />
+        </div>
       </div>
-    </AdminShell>
+    </section>
   );
 }
 
@@ -540,11 +876,70 @@ function CenteredStatus({ text }: { text: string }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function ParishMetricCard({
+  label,
+  value,
+  percentage,
+}: {
+  label: Parroquia;
+  value: number;
+  percentage: number;
+}) {
+  const styles = parishStyles[label];
+
+  return (
+    <div
+      className={`rounded-[1.5rem] border border-white/12 bg-white/[0.085] p-5 backdrop-blur-xl ${styles.glow}`}
+    >
+      <p className={`text-sm font-black ${styles.accent}`}>{label}</p>
+      <div className="mt-5 flex items-end justify-between gap-4">
+        <p className="text-4xl font-black text-white">{value}</p>
+        <p className="text-sm font-bold text-blue-100">{percentage}%</p>
+      </div>
+      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${styles.bar}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-blue-100/60">
+        inscritos por comunidad
+      </p>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string | number;
+  icon?: typeof Users;
+  tone?: "neutral" | "blue" | "violet" | "green" | "gold" | "orange";
+}) {
+  const toneClass = {
+    neutral: "text-blue-100 bg-white/8",
+    blue: "text-sky-200 bg-sky-300/12",
+    violet: "text-violet-200 bg-violet-300/12",
+    green: "text-emerald-200 bg-emerald-300/12",
+    gold: "text-[#D4AF37] bg-[#D4AF37]/12",
+    orange: "text-orange-200 bg-orange-300/12",
+  }[tone];
+
   return (
     <div className="rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <p className="text-sm font-bold text-blue-100">{label}</p>
-      <p className="mt-3 text-3xl font-black text-white">{value}</p>
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm font-bold text-blue-100">{label}</p>
+        {Icon ? (
+          <span className={`grid h-10 w-10 place-items-center rounded-2xl ${toneClass}`}>
+            <Icon className="h-5 w-5" />
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-4 text-3xl font-black text-white">{value}</p>
     </div>
   );
 }
@@ -579,12 +974,28 @@ function SelectFilter({
   );
 }
 
+function PaymentBadge({ status }: { status: EstadoPago }) {
+  const styles = {
+    pendiente: "border-orange-200/20 bg-orange-400/12 text-orange-100",
+    apartado: "border-[#D4AF37]/26 bg-[#D4AF37]/12 text-[#F0D895]",
+    pagado: "border-emerald-200/20 bg-emerald-400/12 text-emerald-100",
+  }[status];
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em] ${styles}`}
+    >
+      {status}
+    </span>
+  );
+}
+
 function TableHead({ children }: { children: React.ReactNode }) {
   return <th className="px-4 py-4 font-black">{children}</th>;
 }
 
 function TableCell({ children }: { children: React.ReactNode }) {
-  return <td className="px-4 py-4 align-top">{children}</td>;
+  return <td className="border-t border-white/10 px-4 py-5 align-top">{children}</td>;
 }
 
 function ActionButton({

@@ -4,7 +4,7 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { CheckCircle2, Loader2, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
-import { getFirebaseDb } from "@/lib/firebase";
+import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase";
 import {
   cleanPhoneDigits,
   KERIGMA_COLLECTION,
@@ -103,6 +103,10 @@ export default function KerigmaPreRegistroPage() {
     setIsSubmitting(true);
 
     try {
+      if (!isFirebaseConfigured()) {
+        throw new Error("Firebase is not configured.");
+      }
+
       await addDoc(collection(getFirebaseDb(), KERIGMA_COLLECTION), {
         nombre: form.nombre.trim(),
         edad: Number(form.edad),
