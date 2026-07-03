@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, Sparkles } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ButtonLink } from "@/components/button-link";
 import { MotionDiv } from "@/components/motion";
@@ -101,7 +101,6 @@ export function Hero() {
           className="max-w-5xl"
         >
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-blue-200/25 bg-white/8 px-4 py-2 text-sm font-semibold text-cream shadow-[0_0_42px_rgba(37,99,235,0.22)] backdrop-blur-md">
-            <Sparkles className="h-4 w-4 text-gold" />
             {heroContent.label}
           </div>
           <h1 className="text-5xl font-black leading-none text-cream sm:text-7xl md:text-8xl lg:text-9xl">

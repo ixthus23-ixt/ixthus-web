@@ -1,8 +1,8 @@
 "use client";
 
 import { MessageCircle, Send } from "lucide-react";
-import { ButtonLink } from "@/components/button-link";
 import { MotionDiv, MotionSection, fadeUp } from "@/components/motion";
+import { socialLinks } from "@/data/site";
 
 export function PrayerSection() {
   return (
@@ -34,9 +34,16 @@ export function PrayerSection() {
               </p>
             </div>
             <div className="flex flex-col gap-4">
-              <ButtonLink href="https://wa.me/" variant="primary">
-                Pedir oración por WhatsApp
-              </ButtonLink>
+              {socialLinks.whatsapp ? (
+                <a
+                  href={socialLinks.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold px-6 text-sm font-bold text-ink shadow-[0_18px_48px_rgba(217,183,111,0.28)] transition hover:bg-gold-soft"
+                >
+                  Pedir oración por WhatsApp
+                </a>
+              ) : null}
               <a
                 href="#primer-paso"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-sm font-bold text-cream transition hover:border-gold/60 hover:text-gold"

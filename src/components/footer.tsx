@@ -7,6 +7,12 @@ import {
   socialLinks,
 } from "@/data/site";
 
+const footerSocialLinks = [
+  { label: "Instagram", href: socialLinks.instagram },
+  { label: "TikTok", href: socialLinks.tiktok },
+  { label: "WhatsApp", href: socialLinks.whatsapp },
+].filter((link) => link.href);
+
 export function Footer() {
   return (
     <footer id="contacto" className="border-t border-white/10 bg-[#041126] py-12">
@@ -61,10 +67,12 @@ export function Footer() {
               </p>
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
-              {socialLinks.map((link) => (
+              {footerSocialLinks.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="rounded-full border border-white/12 px-4 py-2 text-sm font-semibold text-cream transition hover:border-gold/60 hover:text-gold"
                 >
                   {link.label}

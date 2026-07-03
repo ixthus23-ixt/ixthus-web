@@ -265,11 +265,12 @@ export const testimonials = [
   },
 ];
 
-export const socialLinks = [
-  { label: "Instagram", href: "https://instagram.com" },
-  { label: "TikTok", href: "https://tiktok.com" },
-  { label: "WhatsApp", href: "https://wa.me/" },
-];
+export const socialLinks = {
+  instagram:
+    "https://www.instagram.com/_ixthus_?igsh=M3VidjZyMWEzNjVu&utm_source=qr",
+  tiktok: "https://www.tiktok.com/@ixthus4?_r=1&_t=ZS-97jZJnvyq60",
+  whatsapp: "https://wa.me/525587103208",
+};
 
 export const footerContent = {
   description:
