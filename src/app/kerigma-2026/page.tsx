@@ -118,6 +118,7 @@ export default function KerigmaPreRegistroPage() {
         estadoPago: "pendiente",
         montoApartado: 0,
         confirmado: false,
+        contactStatus: "not_contacted",
         notas: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

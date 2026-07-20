@@ -25,6 +25,7 @@ import {
   LogOut,
   MessageCircle,
   Pencil,
+  Send,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -40,6 +41,8 @@ import {
   ESTADOS_PAGO,
   formatCurrency,
   formatRegistrationDate,
+  getContactStatus,
+  getContactStatusLabel,
   getMontoAbonado,
   getSaldoPendiente,
   getWhatsAppUrl,
@@ -47,6 +50,7 @@ import {
   KERIGMA_COSTO,
   PARROQUIAS,
   SEXOS,
+  type ContactStatus,
   type EstadoPago,
   type KerigmaRegistration,
   type Parroquia,
@@ -57,6 +61,7 @@ type Filters = {
   parroquia: "todos" | Parroquia;
   sexo: "todos" | Sexo;
   estadoPago: "todos" | EstadoPago;
+  contactStatus: "todos" | ContactStatus;
 };
 
 type AdminTab = "registros" | "detalles" | "pagos";
@@ -65,6 +70,7 @@ const initialFilters: Filters = {
   parroquia: "todos",
   sexo: "todos",
   estadoPago: "todos",
+  contactStatus: "todos",
 };
 
 const parishStyles: Record<
@@ -119,6 +125,13 @@ export default function AdminKerigmaPage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [activeTab, setActiveTab] = useState<AdminTab>("registros");
+  const [contactUpdates, setContactUpdates] = useState<
+    Record<string, ContactStatus>
+  >({});
+  const [contactSuccess, setContactSuccess] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
 
   const isAdmin = isAdminEmail(user?.email);
 
@@ -187,8 +200,11 @@ export default function AdminKerigmaPage() {
       const paymentMatch =
         filters.estadoPago === "todos" ||
         registration.estadoPago === filters.estadoPago;
+      const contactMatch =
+        filters.contactStatus === "todos" ||
+        getContactStatus(registration) === filters.contactStatus;
 
-      return parishMatch && sexMatch && paymentMatch;
+      return parishMatch && sexMatch && paymentMatch && contactMatch;
     });
   }, [filters, registrations]);
 
@@ -205,6 +221,12 @@ export default function AdminKerigmaPage() {
     );
     const confirmed = registrations.filter(
       (registration) => registration.confirmado,
+    );
+    const contacted = registrations.filter(
+      (registration) => getContactStatus(registration) === "contacted",
+    );
+    const notContacted = registrations.filter(
+      (registration) => getContactStatus(registration) === "not_contacted",
     );
     const totalIncome = registrations.reduce(
       (totalAmount, registration) => totalAmount + getMontoAbonado(registration),
@@ -238,6 +260,8 @@ export default function AdminKerigmaPage() {
       pending: pending.length,
       reserved: reserved.length,
       paid: paid.length,
+      contacted: contacted.length,
+      notContacted: notContacted.length,
       totalIncome,
       pendingBalance,
       fullRegistrationValue: total * KERIGMA_COSTO,
@@ -307,6 +331,62 @@ export default function AdminKerigmaPage() {
     }
 
     await updateRegistration(registration.id, { notas: notes });
+  }
+
+  async function updateContactStatus(
+    registration: KerigmaRegistration,
+    nextStatus: ContactStatus,
+  ) {
+    if (contactUpdates[registration.id]) {
+      return;
+    }
+
+    const currentStatus = getContactStatus(registration);
+
+    if (currentStatus === nextStatus) {
+      return;
+    }
+
+    setContactErrors((current) => {
+      const next = { ...current };
+      delete next[registration.id];
+      return next;
+    });
+    setContactSuccess((current) => {
+      const next = { ...current };
+      delete next[registration.id];
+      return next;
+    });
+    setContactUpdates((current) => ({
+      ...current,
+      [registration.id]: nextStatus,
+    }));
+
+    try {
+      await updateRegistration(registration.id, { contactStatus: nextStatus });
+      setContactSuccess((current) => ({
+        ...current,
+        [registration.id]: true,
+      }));
+      window.setTimeout(() => {
+        setContactSuccess((current) => {
+          const next = { ...current };
+          delete next[registration.id];
+          return next;
+        });
+      }, 1800);
+    } catch {
+      setContactErrors((current) => ({
+        ...current,
+        [registration.id]: "No se pudo actualizar. Inténtalo otra vez.",
+      }));
+    } finally {
+      setContactUpdates((current) => {
+        const next = { ...current };
+        delete next[registration.id];
+        return next;
+      });
+    }
   }
 
   if (authLoading) {
@@ -488,8 +568,12 @@ export default function AdminKerigmaPage() {
             filters={filters}
             setFilters={setFilters}
             updateRegistration={updateRegistration}
+            updateContactStatus={updateContactStatus}
             editAmount={editAmount}
             editNotes={editNotes}
+            contactUpdates={contactUpdates}
+            contactSuccess={contactSuccess}
+            contactErrors={contactErrors}
           />
         ) : null}
 
@@ -507,8 +591,12 @@ function RecordsTab({
   filters,
   setFilters,
   updateRegistration,
+  updateContactStatus,
   editAmount,
   editNotes,
+  contactUpdates,
+  contactSuccess,
+  contactErrors,
 }: {
   dataLoading: boolean;
   filteredRegistrations: KerigmaRegistration[];
@@ -518,8 +606,15 @@ function RecordsTab({
     id: string,
     data: Partial<KerigmaRegistration>,
   ) => Promise<void>;
+  updateContactStatus: (
+    registration: KerigmaRegistration,
+    nextStatus: ContactStatus,
+  ) => Promise<void>;
   editAmount: (registration: KerigmaRegistration) => Promise<void>;
   editNotes: (registration: KerigmaRegistration) => Promise<void>;
+  contactUpdates: Record<string, ContactStatus>;
+  contactSuccess: Record<string, boolean>;
+  contactErrors: Record<string, string>;
 }) {
   return (
     <>
@@ -528,8 +623,8 @@ function RecordsTab({
           <div>
             <h2 className="text-2xl font-black text-white">Registros</h2>
             <p className="mt-1 text-sm leading-6 text-blue-100/78">
-              Filtra por comunidad, sexo y estado de pago para coordinar el
-              seguimiento después de misa.
+              Filtra por comunidad, sexo, estado de pago y contacto para
+              coordinar el seguimiento después de misa.
             </p>
           </div>
           <span className="w-fit rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-bold text-blue-100">
@@ -537,7 +632,7 @@ function RecordsTab({
           </span>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SelectFilter
             label="Parroquia"
             value={filters.parroquia}
@@ -571,6 +666,15 @@ function RecordsTab({
             }
             options={ESTADOS_PAGO}
           />
+          <ContactStatusFilter
+            value={filters.contactStatus}
+            onChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                contactStatus: value as Filters["contactStatus"],
+              }))
+            }
+          />
         </div>
       </section>
 
@@ -582,7 +686,7 @@ function RecordsTab({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1500px] border-separate border-spacing-0 text-left text-sm">
+            <table className="min-w-[1660px] border-separate border-spacing-0 text-left text-sm">
               <thead className="bg-[#061A33]/78 text-xs uppercase tracking-[0.12em] text-blue-100">
                 <tr>
                   <TableHead>Nombre</TableHead>
@@ -591,6 +695,7 @@ function RecordsTab({
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Parroquia</TableHead>
                   <TableHead>Estado de pago</TableHead>
+                  <TableHead>Estado de contacto</TableHead>
                   <TableHead>Costo total</TableHead>
                   <TableHead>Monto abonado</TableHead>
                   <TableHead>Saldo pendiente</TableHead>
@@ -603,6 +708,12 @@ function RecordsTab({
                 {filteredRegistrations.map((registration) => {
                   const amountPaid = getMontoAbonado(registration);
                   const pendingBalance = getSaldoPendiente(registration);
+                  const contactStatus =
+                    contactUpdates[registration.id] ??
+                    getContactStatus(registration);
+                  const isContactUpdating = Boolean(
+                    contactUpdates[registration.id],
+                  );
 
                   return (
                     <tr
@@ -647,6 +758,17 @@ function RecordsTab({
                         <div className="mt-2">
                           <PaymentBadge status={registration.estadoPago} />
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <ContactStatusControl
+                          status={contactStatus}
+                          isUpdating={isContactUpdating}
+                          wasSaved={Boolean(contactSuccess[registration.id])}
+                          error={contactErrors[registration.id]}
+                          onChange={(nextStatus) =>
+                            updateContactStatus(registration, nextStatus)
+                          }
+                        />
                       </TableCell>
                       <TableCell>{formatCurrency(KERIGMA_COSTO)}</TableCell>
                       <TableCell>{formatCurrency(amountPaid)}</TableCell>
@@ -711,12 +833,32 @@ function RecordsTab({
                           <Link
                             href={getWhatsAppUrl(registration.telefono)}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 rounded-full bg-emerald-400/14 px-3 py-2 text-xs font-black text-emerald-100 transition hover:bg-emerald-400/22"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             WhatsApp
                           </Link>
+                          <ActionButton
+                            disabled={isContactUpdating}
+                            onClick={() =>
+                              updateContactStatus(
+                                registration,
+                                getContactStatus(registration) === "contacted"
+                                  ? "not_contacted"
+                                  : "contacted",
+                              )
+                            }
+                          >
+                            {isContactUpdating ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                            {getContactStatus(registration) === "contacted"
+                              ? "Sin contactar"
+                              : "Marcar contactado"}
+                          </ActionButton>
                         </div>
                       </TableCell>
                     </tr>
@@ -741,6 +883,8 @@ function DetailsTab({
     pending: number;
     reserved: number;
     paid: number;
+    contacted: number;
+    notContacted: number;
   };
 }) {
   const men = stats.bySex.find((item) => item.label === "Hombre")?.value ?? 0;
@@ -774,6 +918,18 @@ function DetailsTab({
         label="Pagados"
         value={stats.paid}
         tone="green"
+      />
+      <StatCard
+        icon={Send}
+        label="Contactados"
+        value={stats.contacted}
+        tone="blue"
+      />
+      <StatCard
+        icon={MessageCircle}
+        label="Pendientes de contactar"
+        value={stats.notContacted}
+        tone="gold"
       />
     </section>
   );
@@ -974,6 +1130,31 @@ function SelectFilter({
   );
 }
 
+function ContactStatusFilter({
+  value,
+  onChange,
+}: {
+  value: Filters["contactStatus"];
+  onChange: (value: Filters["contactStatus"]) => void;
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-bold text-blue-50">Estado de contacto</span>
+      <select
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value as Filters["contactStatus"])
+        }
+        className="field-input"
+      >
+        <option value="todos">Todos</option>
+        <option value="not_contacted">Sin contactar</option>
+        <option value="contacted">Contactados</option>
+      </select>
+    </label>
+  );
+}
+
 function PaymentBadge({ status }: { status: EstadoPago }) {
   const styles = {
     pendiente: "border-orange-200/20 bg-orange-400/12 text-orange-100",
@@ -990,6 +1171,71 @@ function PaymentBadge({ status }: { status: EstadoPago }) {
   );
 }
 
+function ContactStatusBadge({ status }: { status: ContactStatus }) {
+  const styles = {
+    not_contacted: "border-amber-200/20 bg-amber-300/10 text-amber-100",
+    contacted: "border-sky-200/20 bg-sky-300/12 text-sky-100",
+  }[status];
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em] ${styles}`}
+    >
+      {getContactStatusLabel(status)}
+    </span>
+  );
+}
+
+function ContactStatusControl({
+  status,
+  isUpdating,
+  wasSaved,
+  error,
+  onChange,
+}: {
+  status: ContactStatus;
+  isUpdating: boolean;
+  wasSaved: boolean;
+  error?: string;
+  onChange: (status: ContactStatus) => void;
+}) {
+  return (
+    <div className="min-w-44">
+      <div className="flex flex-col gap-2">
+        <select
+          value={status}
+          disabled={isUpdating}
+          onChange={(event) => onChange(event.target.value as ContactStatus)}
+          className="rounded-full border border-white/12 bg-[#061A33] px-3 py-2 text-sm font-bold text-blue-50 disabled:cursor-not-allowed disabled:opacity-65"
+        >
+          <option value="not_contacted">Sin contactar</option>
+          <option value="contacted">Contactado</option>
+        </select>
+        <ContactStatusBadge status={status} />
+      </div>
+      <div className="mt-2 min-h-5">
+        {isUpdating ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-100">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Guardando
+          </span>
+        ) : null}
+        {!isUpdating && wasSaved ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-200">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Guardado
+          </span>
+        ) : null}
+        {!isUpdating && error ? (
+          <span className="text-xs font-bold leading-5 text-red-200">
+            {error}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TableHead({ children }: { children: React.ReactNode }) {
   return <th className="px-4 py-4 font-black">{children}</th>;
 }
@@ -1001,15 +1247,18 @@ function TableCell({ children }: { children: React.ReactNode }) {
 function ActionButton({
   children,
   onClick,
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-full border border-white/12 px-3 py-2 text-xs font-black text-blue-50 transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+      disabled={disabled}
+      className="inline-flex items-center gap-1 rounded-full border border-white/12 px-3 py-2 text-xs font-black text-blue-50 transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37] disabled:cursor-not-allowed disabled:opacity-55"
     >
       {children}
     </button>

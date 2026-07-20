@@ -13,9 +13,12 @@ export const SEXOS = ["Hombre", "Mujer"] as const;
 
 export const ESTADOS_PAGO = ["pendiente", "apartado", "pagado"] as const;
 
+export const CONTACT_STATUSES = ["not_contacted", "contacted"] as const;
+
 export type Parroquia = (typeof PARROQUIAS)[number];
 export type Sexo = (typeof SEXOS)[number];
 export type EstadoPago = (typeof ESTADOS_PAGO)[number];
+export type ContactStatus = (typeof CONTACT_STATUSES)[number];
 
 export type KerigmaRegistration = {
   id: string;
@@ -28,6 +31,7 @@ export type KerigmaRegistration = {
   estadoPago: EstadoPago;
   montoApartado: number;
   confirmado: boolean;
+  contactStatus?: ContactStatus;
   notas: string;
   createdAt?: {
     toDate?: () => Date;
@@ -90,6 +94,18 @@ export function formatCurrency(value: number) {
     currency: "MXN",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+export function getContactStatus(
+  registration: Pick<KerigmaRegistration, "contactStatus">,
+): ContactStatus {
+  return registration.contactStatus === "contacted"
+    ? "contacted"
+    : "not_contacted";
+}
+
+export function getContactStatusLabel(status: ContactStatus) {
+  return status === "contacted" ? "Contactado" : "Sin contactar";
 }
 
 export function formatRegistrationDate(
