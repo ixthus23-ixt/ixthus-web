@@ -108,6 +108,15 @@ export function getContactStatusLabel(status: ContactStatus) {
   return status === "contacted" ? "Contactado" : "Sin contactar";
 }
 
+export function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 export function formatRegistrationDate(
   value: KerigmaRegistration["createdAt"],
 ) {
