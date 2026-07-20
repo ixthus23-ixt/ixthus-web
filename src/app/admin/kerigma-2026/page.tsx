@@ -489,10 +489,14 @@ export default function AdminKerigmaPage() {
         tone: "success",
         message: "Inscripción enviada a papelera.",
       });
-    } catch {
+    } catch (error) {
+      const message = isFirestorePermissionDenied(error)
+        ? "Firestore rechazó la eliminación. Publica las reglas actualizadas y confirma que tu usuario exista en admins/{uid} o admin_emails/{correo}."
+        : "No se pudo eliminar la inscripción. Inténtalo nuevamente.";
+
       setAdminNotice({
         tone: "error",
-        message: "No se pudo eliminar la inscripción. Inténtalo nuevamente.",
+        message,
       });
     } finally {
       setIsDeleting(false);
@@ -554,8 +558,9 @@ export default function AdminKerigmaPage() {
         message: "Inscripción restaurada correctamente.",
       });
     } catch (error) {
-      const message =
-        error instanceof Error && error.message === "restore-phone-conflict"
+      const message = isFirestorePermissionDenied(error)
+        ? "Firestore rechazó la restauración. Publica las reglas actualizadas y confirma que tu usuario esté autorizado como administrador."
+        : error instanceof Error && error.message === "restore-phone-conflict"
           ? "No se puede restaurar: el teléfono ya pertenece a otra inscripción activa. Revisa primero cuál registro debe conservarse."
           : "No se pudo restaurar la inscripción. Revisa el teléfono e inténtalo nuevamente.";
 
@@ -1843,5 +1848,14 @@ function ActionButton({
     >
       {children}
     </button>
+  );
+}
+
+function isFirestorePermissionDenied(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "permission-denied"
   );
 }

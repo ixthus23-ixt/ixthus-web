@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+          || (
+            request.auth.token.email is string
+            && exists(/databases/$(database)/documents/admin_emails/$(request.auth.token.email))
+          )
+        );
+    }
+
+    function isTenDigitPhone(phone) {
+      return phone is string && phone.matches('^[0-9]{10}$');
+    }
+
+    function validPublicRegistrationCreate(registroId) {
+      return request.resource.data.keys().hasAll([
+          'nombre',
+          'edad',
+          'sexo',
+          'telefono',
+          'normalizedPhone',
+          'parroquia',
+          'estadoPago',
+          'montoApartado',
+          'confirmado',
+          'contactStatus',
+          'isDeleted',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isTenDigitPhone(request.resource.data.normalizedPhone)
+        && request.resource.data.estadoPago == 'pendiente'
+        && request.resource.data.montoApartado == 0
+        && request.resource.data.confirmado == false
+        && request.resource.data.contactStatus == 'not_contacted'
+        && request.resource.data.isDeleted == false
+        && getAfter(
+          /databases/$(database)/documents/kerigma2026_phone_index/$(request.resource.data.normalizedPhone)
+        ).data.registrationId == registroId;
+    }
+
+    match /kerigma2026_pre_registros/{registroId} {
+      allow create: if validPublicRegistrationCreate(registroId);
+      allow read, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /kerigma2026_phone_index/{normalizedPhone} {
+      allow get: if isTenDigitPhone(normalizedPhone);
+      allow list: if false;
+      allow create: if isAdmin()
+        || (
+          isTenDigitPhone(normalizedPhone)
+          && !exists(/databases/$(database)/documents/kerigma2026_phone_index/$(normalizedPhone))
+          && request.resource.data.keys().hasOnly([
+            'registrationId',
+            'createdAt',
+            'updatedAt'
+          ])
+          && request.resource.data.registrationId is string
+          && getAfter(
+            /databases/$(database)/documents/kerigma2026_pre_registros/$(request.resource.data.registrationId)
+          ).data.normalizedPhone == normalizedPhone
+        );
+      allow update, delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /admin_emails/{email} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

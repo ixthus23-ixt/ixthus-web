@@ -77,42 +77,17 @@ kerigma2026_pre_registros
 kerigma2026_phone_index
 ```
 
-Reglas sugeridas de Firestore:
+Reglas de Firestore:
 
 ```txt
-rules_version = '2';
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    match /kerigma2026_pre_registros/{registroId} {
-      allow create: if request.resource.data.normalizedPhone is string
-        && request.resource.data.normalizedPhone.matches('^[0-9]{10}$')
-        && getAfter(/databases/$(database)/documents/kerigma2026_phone_index/$(request.resource.data.normalizedPhone)).data.registrationId == registroId;
-      allow read, update, delete: if isAdmin();
-    }
-
-    match /kerigma2026_phone_index/{normalizedPhone} {
-      allow get: if normalizedPhone.matches('^[0-9]{10}$');
-      allow list: if false;
-      allow create: if normalizedPhone.matches('^[0-9]{10}$')
-        && !exists(/databases/$(database)/documents/kerigma2026_phone_index/$(normalizedPhone))
-        && request.resource.data.registrationId is string
-        && request.resource.data.keys().hasOnly(['registrationId', 'createdAt', 'updatedAt']);
-      allow update, delete: if isAdmin();
-    }
-  }
-}
+firestore.rules
 ```
 
 Para que un administrador tenga acceso real en Firestore, crea un documento en
-`admins/{uid}` usando el UID del usuario de Firebase Auth. La lista
+`admins/{uid}` usando el UID del usuario de Firebase Auth o un documento en
+`admin_emails/{correo}` usando el correo exacto del administrador. La lista
 `ADMIN_EMAILS` en `src/lib/admin.ts` controla el acceso visual al panel; las
-reglas anteriores protegen la lectura y edición de los datos.
+reglas de `firestore.rules` protegen la lectura y edición real de los datos.
 
 `kerigma2026_phone_index` reserva teléfonos normalizados para prevenir
 duplicados desde el formulario público. El documento usa como ID el teléfono de
