@@ -1,5 +1,8 @@
 export const KERIGMA_COLLECTION = "kerigma2026_pre_registros";
 
+export const KERIGMA_PHONE_INDEX_COLLECTION =
+  "kerigma2026_phone_index";
+
 export const KERIGMA_COSTO = 800;
 
 export const PARROQUIAS = [
@@ -26,12 +29,24 @@ export type KerigmaRegistration = {
   edad: number;
   sexo: Sexo;
   telefono: string;
+  normalizedPhone?: string;
   parroquia: Parroquia;
   parroquiaOtra: string;
   estadoPago: EstadoPago;
   montoApartado: number;
   confirmado: boolean;
   contactStatus?: ContactStatus;
+  isDeleted?: boolean;
+  deletedAt?: {
+    toDate?: () => Date;
+  };
+  deletedBy?: string;
+  duplicatePhoneOverride?: boolean;
+  duplicatePhoneReason?: string;
+  duplicatePhoneAuthorizedBy?: string;
+  duplicatePhoneAuthorizedAt?: {
+    toDate?: () => Date;
+  };
   notas: string;
   createdAt?: {
     toDate?: () => Date;
@@ -48,7 +63,51 @@ export function cleanPhoneDigits(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
+export function normalizeMexicanPhoneTo10(phone: string) {
+  let digits = cleanPhoneDigits(phone);
+
+  if (digits.startsWith("521") && digits.length === 13) {
+    digits = digits.slice(3);
+  } else if (digits.startsWith("52") && digits.length === 12) {
+    digits = digits.slice(2);
+  }
+
+  return digits.length === 10 ? digits : "";
+}
+
+export function isValidMexicanPhone(phone: string) {
+  return normalizeMexicanPhoneTo10(phone).length === 10;
+}
+
+export function formatMexicanPhone(phone: string) {
+  const normalizedPhone = normalizeMexicanPhoneTo10(phone);
+
+  if (!normalizedPhone) {
+    return phone;
+  }
+
+  return `${normalizedPhone.slice(0, 2)} ${normalizedPhone.slice(
+    2,
+    6,
+  )} ${normalizedPhone.slice(6)}`;
+}
+
+export function getRegistrationNormalizedPhone(
+  registration: Pick<KerigmaRegistration, "normalizedPhone" | "telefono">,
+) {
+  return (
+    registration.normalizedPhone ||
+    normalizeMexicanPhoneTo10(registration.telefono)
+  );
+}
+
 export function normalizeMexicoPhone(phone: string) {
+  const normalizedPhone = normalizeMexicanPhoneTo10(phone);
+
+  if (normalizedPhone) {
+    return `52${normalizedPhone}`;
+  }
+
   const digits = cleanPhoneDigits(phone);
 
   if (digits.startsWith("52")) {
@@ -106,6 +165,12 @@ export function getContactStatus(
 
 export function getContactStatusLabel(status: ContactStatus) {
   return status === "contacted" ? "Contactado" : "Sin contactar";
+}
+
+export function getIsDeleted(
+  registration: Pick<KerigmaRegistration, "isDeleted">,
+) {
+  return registration.isDeleted === true;
 }
 
 export function normalizeSearchText(value: string) {

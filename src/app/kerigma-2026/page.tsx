@@ -1,13 +1,21 @@
 "use client";
 
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  runTransaction,
+  serverTimestamp,
+} from "firebase/firestore";
 import { CheckCircle2, Loader2, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase";
 import {
   cleanPhoneDigits,
+  formatMexicanPhone,
   KERIGMA_COLLECTION,
+  KERIGMA_PHONE_INDEX_COLLECTION,
+  normalizeMexicanPhoneTo10,
   PARROQUIAS,
   SEXOS,
   type Parroquia,
@@ -31,6 +39,9 @@ const initialFormState: FormState = {
   parroquia: "",
   parroquiaOtra: "",
 };
+
+const duplicatePhoneMessage =
+  "Ya existe una inscripción registrada con este número de teléfono. Si necesitas corregir los datos, comunícate con el equipo de IXTHUS.";
 
 export default function KerigmaPreRegistroPage() {
   const [form, setForm] = useState<FormState>(initialFormState);
@@ -74,8 +85,8 @@ export default function KerigmaPreRegistroPage() {
 
     if (!form.telefono.trim()) {
       nextErrors.telefono = "Escribe un teléfono.";
-    } else if (phoneDigits.length < 10) {
-      nextErrors.telefono = "El teléfono debe tener mínimo 10 dígitos.";
+    } else if (!normalizeMexicanPhoneTo10(form.telefono)) {
+      nextErrors.telefono = "El teléfono debe tener exactamente 10 dígitos.";
     }
 
     if (!form.parroquia) {
@@ -107,28 +118,66 @@ export default function KerigmaPreRegistroPage() {
         throw new Error("Firebase is not configured.");
       }
 
-      await addDoc(collection(getFirebaseDb(), KERIGMA_COLLECTION), {
-        nombre: form.nombre.trim(),
-        edad: Number(form.edad),
-        sexo: form.sexo,
-        telefono: phoneDigits,
-        parroquia: form.parroquia,
-        parroquiaOtra:
-          form.parroquia === "Otra" ? form.parroquiaOtra.trim() : "",
-        estadoPago: "pendiente",
-        montoApartado: 0,
-        confirmado: false,
-        contactStatus: "not_contacted",
-        notas: "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const db = getFirebaseDb();
+      const normalizedPhone = normalizeMexicanPhoneTo10(form.telefono);
+      const registrationRef = doc(collection(db, KERIGMA_COLLECTION));
+      const phoneIndexRef = doc(
+        db,
+        KERIGMA_PHONE_INDEX_COLLECTION,
+        normalizedPhone,
+      );
+
+      if (!normalizedPhone) {
+        setErrors((current) => ({
+          ...current,
+          telefono: "El teléfono debe tener exactamente 10 dígitos.",
+        }));
+        return;
+      }
+
+      await runTransaction(db, async (transaction) => {
+        const phoneIndexSnapshot = await transaction.get(phoneIndexRef);
+
+        if (phoneIndexSnapshot.exists()) {
+          throw new Error("duplicate-phone");
+        }
+
+        transaction.set(registrationRef, {
+          nombre: form.nombre.trim(),
+          edad: Number(form.edad),
+          sexo: form.sexo,
+          telefono: formatMexicanPhone(normalizedPhone),
+          normalizedPhone,
+          parroquia: form.parroquia,
+          parroquiaOtra:
+            form.parroquia === "Otra" ? form.parroquiaOtra.trim() : "",
+          estadoPago: "pendiente",
+          montoApartado: 0,
+          confirmado: false,
+          contactStatus: "not_contacted",
+          isDeleted: false,
+          notas: "",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        transaction.set(phoneIndexRef, {
+          registrationId: registrationRef.id,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
       });
 
       setForm(initialFormState);
       setSuccess(true);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "duplicate-phone") {
+        setSubmitError(duplicatePhoneMessage);
+        return;
+      }
+
       setSubmitError(
-        "No pudimos guardar el registro. Revisa la configuración de Firebase e inténtalo nuevamente.",
+        "No pudimos comprobar o guardar el registro. Inténtalo nuevamente en unos momentos.",
       );
     } finally {
       setIsSubmitting(false);

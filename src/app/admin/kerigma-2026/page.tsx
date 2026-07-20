@@ -12,10 +12,13 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import {
+  AlertTriangle,
+  Archive,
   BarChart3,
   CheckCircle2,
   CircleDollarSign,
@@ -28,8 +31,10 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Trash2,
   Users,
   X,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -43,13 +48,17 @@ import {
   ESTADOS_PAGO,
   formatCurrency,
   formatRegistrationDate,
+  formatMexicanPhone,
   getContactStatus,
   getContactStatusLabel,
+  getIsDeleted,
   getMontoAbonado,
+  getRegistrationNormalizedPhone,
   getSaldoPendiente,
   getWhatsAppUrl,
   KERIGMA_COLLECTION,
   KERIGMA_COSTO,
+  KERIGMA_PHONE_INDEX_COLLECTION,
   normalizeSearchText,
   PARROQUIAS,
   SEXOS,
@@ -68,7 +77,7 @@ type Filters = {
   contactStatus: "todos" | ContactStatus;
 };
 
-type AdminTab = "registros" | "detalles" | "pagos";
+type AdminTab = "registros" | "detalles" | "pagos" | "papelera";
 
 const initialFilters: Filters = {
   nameSearch: "",
@@ -116,6 +125,7 @@ const tabs: Array<{
   { id: "registros", label: "Registros", icon: ClipboardList },
   { id: "detalles", label: "Detalles de inscripciones", icon: BarChart3 },
   { id: "pagos", label: "Pagos e ingresos", icon: CircleDollarSign },
+  { id: "papelera", label: "Papelera", icon: Archive },
 ];
 
 export default function AdminKerigmaPage() {
@@ -137,6 +147,16 @@ export default function AdminKerigmaPage() {
     {},
   );
   const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
+  const [deleteTarget, setDeleteTarget] =
+    useState<KerigmaRegistration | null>(null);
+  const [restoreTarget, setRestoreTarget] =
+    useState<KerigmaRegistration | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [adminNotice, setAdminNotice] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const isAdmin = isAdminEmail(user?.email);
 
@@ -195,10 +215,36 @@ export default function AdminKerigmaPage() {
     );
   }, [isAdmin, user]);
 
+  const activeRegistrations = useMemo(
+    () => registrations.filter((registration) => !getIsDeleted(registration)),
+    [registrations],
+  );
+
+  const deletedRegistrations = useMemo(
+    () => registrations.filter((registration) => getIsDeleted(registration)),
+    [registrations],
+  );
+
+  const duplicatePhoneCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    activeRegistrations.forEach((registration) => {
+      const normalizedPhone = getRegistrationNormalizedPhone(registration);
+
+      if (!normalizedPhone) {
+        return;
+      }
+
+      counts[normalizedPhone] = (counts[normalizedPhone] ?? 0) + 1;
+    });
+
+    return counts;
+  }, [activeRegistrations]);
+
   const filteredRegistrations = useMemo(() => {
     const normalizedNameSearch = normalizeSearchText(filters.nameSearch);
 
-    return registrations.filter((registration) => {
+    return activeRegistrations.filter((registration) => {
       const normalizedName = normalizeSearchText(registration.nombre);
       const nameMatch =
         normalizedNameSearch.length === 0 ||
@@ -219,33 +265,33 @@ export default function AdminKerigmaPage() {
         nameMatch && parishMatch && sexMatch && paymentMatch && contactMatch
       );
     });
-  }, [filters, registrations]);
+  }, [activeRegistrations, filters]);
 
   const stats = useMemo(() => {
-    const total = registrations.length;
-    const paid = registrations.filter(
+    const total = activeRegistrations.length;
+    const paid = activeRegistrations.filter(
       (registration) => registration.estadoPago === "pagado",
     );
-    const reserved = registrations.filter(
+    const reserved = activeRegistrations.filter(
       (registration) => registration.estadoPago === "apartado",
     );
-    const pending = registrations.filter(
+    const pending = activeRegistrations.filter(
       (registration) => registration.estadoPago === "pendiente",
     );
-    const confirmed = registrations.filter(
+    const confirmed = activeRegistrations.filter(
       (registration) => registration.confirmado,
     );
-    const contacted = registrations.filter(
+    const contacted = activeRegistrations.filter(
       (registration) => getContactStatus(registration) === "contacted",
     );
-    const notContacted = registrations.filter(
+    const notContacted = activeRegistrations.filter(
       (registration) => getContactStatus(registration) === "not_contacted",
     );
-    const totalIncome = registrations.reduce(
+    const totalIncome = activeRegistrations.reduce(
       (totalAmount, registration) => totalAmount + getMontoAbonado(registration),
       0,
     );
-    const pendingBalance = registrations.reduce(
+    const pendingBalance = activeRegistrations.reduce(
       (totalAmount, registration) =>
         totalAmount + getSaldoPendiente(registration),
       0,
@@ -254,7 +300,7 @@ export default function AdminKerigmaPage() {
     return {
       total,
       byParish: PARROQUIAS.map((parroquia) => {
-        const value = registrations.filter(
+        const value = activeRegistrations.filter(
           (registration) => registration.parroquia === parroquia,
         ).length;
 
@@ -266,8 +312,9 @@ export default function AdminKerigmaPage() {
       }),
       bySex: SEXOS.map((sexo) => ({
         label: sexo,
-        value: registrations.filter((registration) => registration.sexo === sexo)
-          .length,
+        value: activeRegistrations.filter(
+          (registration) => registration.sexo === sexo,
+        ).length,
       })),
       confirmed: confirmed.length,
       pending: pending.length,
@@ -279,7 +326,7 @@ export default function AdminKerigmaPage() {
       pendingBalance,
       fullRegistrationValue: total * KERIGMA_COSTO,
     };
-  }, [registrations]);
+  }, [activeRegistrations]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -399,6 +446,122 @@ export default function AdminKerigmaPage() {
         delete next[registration.id];
         return next;
       });
+    }
+  }
+
+  async function deleteRegistration(registration: KerigmaRegistration) {
+    if (!user || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setAdminNotice(null);
+
+    try {
+      const db = getFirebaseDb();
+      const registrationRef = doc(db, KERIGMA_COLLECTION, registration.id);
+      const normalizedPhone = getRegistrationNormalizedPhone(registration);
+      const phoneIndexRef = normalizedPhone
+        ? doc(db, KERIGMA_PHONE_INDEX_COLLECTION, normalizedPhone)
+        : null;
+
+      await runTransaction(db, async (transaction) => {
+        if (phoneIndexRef) {
+          const phoneIndexSnapshot = await transaction.get(phoneIndexRef);
+          if (
+            phoneIndexSnapshot.exists() &&
+            phoneIndexSnapshot.data().registrationId === registration.id
+          ) {
+            transaction.delete(phoneIndexRef);
+          }
+        }
+
+        transaction.update(registrationRef, {
+          isDeleted: true,
+          deletedAt: serverTimestamp(),
+          deletedBy: user.email || user.uid,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      setDeleteTarget(null);
+      setAdminNotice({
+        tone: "success",
+        message: "Inscripción enviada a papelera.",
+      });
+    } catch {
+      setAdminNotice({
+        tone: "error",
+        message: "No se pudo eliminar la inscripción. Inténtalo nuevamente.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function restoreRegistration(registration: KerigmaRegistration) {
+    if (isRestoring) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setAdminNotice(null);
+
+    try {
+      const db = getFirebaseDb();
+      const registrationRef = doc(db, KERIGMA_COLLECTION, registration.id);
+      const normalizedPhone = getRegistrationNormalizedPhone(registration);
+
+      if (!normalizedPhone) {
+        throw new Error("invalid-phone");
+      }
+
+      const phoneIndexRef = doc(
+        db,
+        KERIGMA_PHONE_INDEX_COLLECTION,
+        normalizedPhone,
+      );
+
+      await runTransaction(db, async (transaction) => {
+        const phoneIndexSnapshot = await transaction.get(phoneIndexRef);
+
+        if (
+          phoneIndexSnapshot.exists() &&
+          phoneIndexSnapshot.data().registrationId !== registration.id
+        ) {
+          throw new Error("restore-phone-conflict");
+        }
+
+        transaction.update(registrationRef, {
+          isDeleted: false,
+          normalizedPhone,
+          telefono: formatMexicanPhone(normalizedPhone),
+          deletedAt: null,
+          deletedBy: "",
+          updatedAt: serverTimestamp(),
+        });
+
+        transaction.set(phoneIndexRef, {
+          registrationId: registration.id,
+          restoredAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      setRestoreTarget(null);
+      setAdminNotice({
+        tone: "success",
+        message: "Inscripción restaurada correctamente.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message === "restore-phone-conflict"
+          ? "No se puede restaurar: el teléfono ya pertenece a otra inscripción activa. Revisa primero cuál registro debe conservarse."
+          : "No se pudo restaurar la inscripción. Revisa el teléfono e inténtalo nuevamente.";
+
+      setAdminNotice({ tone: "error", message });
+    } finally {
+      setIsRestoring(false);
     }
   }
 
@@ -574,6 +737,18 @@ export default function AdminKerigmaPage() {
           </div>
         </nav>
 
+        {adminNotice ? (
+          <div
+            className={`mt-6 rounded-3xl border p-4 text-sm font-bold ${
+              adminNotice.tone === "success"
+                ? "border-emerald-300/24 bg-emerald-400/12 text-emerald-100"
+                : "border-red-300/24 bg-red-500/12 text-red-100"
+            }`}
+          >
+            {adminNotice.message}
+          </div>
+        ) : null}
+
         {activeTab === "registros" ? (
           <RecordsTab
             dataLoading={dataLoading}
@@ -582,6 +757,8 @@ export default function AdminKerigmaPage() {
             setFilters={setFilters}
             updateRegistration={updateRegistration}
             updateContactStatus={updateContactStatus}
+            duplicatePhoneCounts={duplicatePhoneCounts}
+            onRequestDelete={setDeleteTarget}
             editAmount={editAmount}
             editNotes={editNotes}
             contactUpdates={contactUpdates}
@@ -593,6 +770,35 @@ export default function AdminKerigmaPage() {
         {activeTab === "detalles" ? <DetailsTab stats={stats} /> : null}
 
         {activeTab === "pagos" ? <PaymentsTab stats={stats} /> : null}
+
+        {activeTab === "papelera" ? (
+          <TrashTab
+            deletedRegistrations={deletedRegistrations}
+            onRequestRestore={setRestoreTarget}
+          />
+        ) : null}
+
+        <DeleteRegistrationModal
+          registration={deleteTarget}
+          isLoading={isDeleting}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => {
+            if (deleteTarget) {
+              deleteRegistration(deleteTarget);
+            }
+          }}
+        />
+
+        <RestoreRegistrationModal
+          registration={restoreTarget}
+          isLoading={isRestoring}
+          onCancel={() => setRestoreTarget(null)}
+          onConfirm={() => {
+            if (restoreTarget) {
+              restoreRegistration(restoreTarget);
+            }
+          }}
+        />
       </div>
     </AdminShell>
   );
@@ -605,6 +811,8 @@ function RecordsTab({
   setFilters,
   updateRegistration,
   updateContactStatus,
+  duplicatePhoneCounts,
+  onRequestDelete,
   editAmount,
   editNotes,
   contactUpdates,
@@ -623,6 +831,8 @@ function RecordsTab({
     registration: KerigmaRegistration,
     nextStatus: ContactStatus,
   ) => Promise<void>;
+  duplicatePhoneCounts: Record<string, number>;
+  onRequestDelete: (registration: KerigmaRegistration) => void;
   editAmount: (registration: KerigmaRegistration) => Promise<void>;
   editNotes: (registration: KerigmaRegistration) => Promise<void>;
   contactUpdates: Record<string, ContactStatus>;
@@ -762,6 +972,11 @@ function RecordsTab({
                   const isContactUpdating = Boolean(
                     contactUpdates[registration.id],
                   );
+                  const normalizedPhone =
+                    getRegistrationNormalizedPhone(registration);
+                  const isPossibleDuplicate =
+                    normalizedPhone &&
+                    (duplicatePhoneCounts[normalizedPhone] ?? 0) > 1;
 
                   return (
                     <tr
@@ -775,6 +990,12 @@ function RecordsTab({
                         {registration.notas ? (
                           <div className="mt-1 max-w-[240px] truncate text-xs font-medium text-blue-200/82">
                             {registration.notas}
+                          </div>
+                        ) : null}
+                        {isPossibleDuplicate ? (
+                          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200/20 bg-amber-300/10 px-2.5 py-1 text-xs font-black text-amber-100">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Posible duplicado
                           </div>
                         ) : null}
                       </TableCell>
@@ -907,6 +1128,10 @@ function RecordsTab({
                               ? "Sin contactar"
                               : "Marcar contactado"}
                           </ActionButton>
+                          <ActionButton onClick={() => onRequestDelete(registration)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Eliminar inscripción
+                          </ActionButton>
                         </div>
                       </TableCell>
                     </tr>
@@ -979,6 +1204,100 @@ function DetailsTab({
         value={stats.notContacted}
         tone="gold"
       />
+    </section>
+  );
+}
+
+function TrashTab({
+  deletedRegistrations,
+  onRequestRestore,
+}: {
+  deletedRegistrations: KerigmaRegistration[];
+  onRequestRestore: (registration: KerigmaRegistration) => void;
+}) {
+  return (
+    <section className="mt-8 overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.07] shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+      <div className="border-b border-white/10 p-5">
+        <h2 className="text-2xl font-black text-white">Papelera</h2>
+        <p className="mt-2 text-sm leading-6 text-blue-100/78">
+          Las inscripciones eliminadas no aparecen en registros, filtros,
+          estadísticas, pagos ni acciones de seguimiento. Puedes restaurarlas si
+          el teléfono no está ocupado por otra inscripción activa.
+        </p>
+      </div>
+
+      {deletedRegistrations.length === 0 ? (
+        <div className="grid min-h-56 place-items-center p-8 text-center">
+          <div className="max-w-md">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/12 bg-white/[0.08] text-blue-100">
+              <Archive className="h-6 w-6" />
+            </div>
+            <h3 className="mt-5 text-2xl font-black text-white">
+              No hay inscripciones en la papelera.
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-blue-100/78">
+              Cuando elimines una inscripción, aparecerá aquí para poder
+              revisarla o restaurarla.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[980px] border-separate border-spacing-0 text-left text-sm">
+            <thead className="bg-[#061A33]/78 text-xs uppercase tracking-[0.12em] text-blue-100">
+              <tr>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Teléfono</TableHead>
+                <TableHead>Parroquia</TableHead>
+                <TableHead>Estado de pago</TableHead>
+                <TableHead>Eliminado</TableHead>
+                <TableHead>Acciones</TableHead>
+              </tr>
+            </thead>
+            <tbody>
+              {deletedRegistrations.map((registration) => (
+                <tr
+                  key={registration.id}
+                  className="border-t border-white/10 text-blue-50/90 transition hover:bg-white/[0.045]"
+                >
+                  <TableCell>
+                    <div className="font-black text-white">
+                      {registration.nombre}
+                    </div>
+                    <div className="mt-1 text-xs text-blue-200/82">
+                      {registration.edad} años · {registration.sexo}
+                    </div>
+                  </TableCell>
+                  <TableCell>{registration.telefono}</TableCell>
+                  <TableCell>
+                    {registration.parroquia === "Otra" &&
+                    registration.parroquiaOtra
+                      ? registration.parroquiaOtra
+                      : registration.parroquia}
+                  </TableCell>
+                  <TableCell>
+                    <PaymentBadge status={registration.estadoPago} />
+                  </TableCell>
+                  <TableCell>
+                    <div>{formatRegistrationDate(registration.deletedAt)}</div>
+                    {registration.deletedBy ? (
+                      <div className="mt-1 text-xs text-blue-200/72">
+                        Por {registration.deletedBy}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <ActionButton onClick={() => onRequestRestore(registration)}>
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Restaurar
+                    </ActionButton>
+                  </TableCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
@@ -1375,6 +1694,135 @@ function TableHead({ children }: { children: React.ReactNode }) {
 
 function TableCell({ children }: { children: React.ReactNode }) {
   return <td className="border-t border-white/10 px-4 py-5 align-top">{children}</td>;
+}
+
+function DeleteRegistrationModal({
+  registration,
+  isLoading,
+  onCancel,
+  onConfirm,
+}: {
+  registration: KerigmaRegistration | null;
+  isLoading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!registration) {
+    return null;
+  }
+
+  return (
+    <ConfirmationModal
+      title="Eliminar inscripción"
+      description={`¿Deseas eliminar la inscripción de ${registration.nombre}? Dejará de aparecer en registros y estadísticas, pero podrás restaurarla desde la papelera.`}
+      icon={<Trash2 className="h-6 w-6" />}
+      confirmLabel="Eliminar inscripción"
+      isLoading={isLoading}
+      tone="danger"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+function RestoreRegistrationModal({
+  registration,
+  isLoading,
+  onCancel,
+  onConfirm,
+}: {
+  registration: KerigmaRegistration | null;
+  isLoading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!registration) {
+    return null;
+  }
+
+  return (
+    <ConfirmationModal
+      title="Restaurar inscripción"
+      description={`¿Deseas restaurar la inscripción de ${registration.nombre}? Se comprobará que su teléfono no esté usado por otra inscripción activa antes de restaurarla.`}
+      icon={<RotateCcw className="h-6 w-6" />}
+      confirmLabel="Restaurar inscripción"
+      isLoading={isLoading}
+      tone="primary"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+function ConfirmationModal({
+  title,
+  description,
+  icon,
+  confirmLabel,
+  isLoading,
+  tone,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  confirmLabel: string;
+  isLoading: boolean;
+  tone: "danger" | "primary";
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="kerigma-confirmation-title"
+      className="fixed inset-0 z-50 grid place-items-center bg-[#020817]/78 px-4 backdrop-blur-sm"
+    >
+      <div className="w-full max-w-lg rounded-[2rem] border border-white/14 bg-[#061A33] p-6 text-[#F8FAFC] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
+        <div
+          className={`grid h-14 w-14 place-items-center rounded-2xl border ${
+            tone === "danger"
+              ? "border-red-200/24 bg-red-500/12 text-red-100"
+              : "border-[#D4AF37]/28 bg-[#D4AF37]/12 text-[#D4AF37]"
+          }`}
+        >
+          {icon}
+        </div>
+        <h2
+          id="kerigma-confirmation-title"
+          className="mt-5 text-2xl font-black text-white"
+        >
+          {title}
+        </h2>
+        <p className="mt-3 leading-7 text-blue-100">{description}</p>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onCancel}
+            className="rounded-full border border-white/14 px-5 py-3 text-sm font-black text-blue-50 transition hover:border-white/28 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onConfirm}
+            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-70 ${
+              tone === "danger"
+                ? "bg-red-300 text-[#210608] hover:bg-red-200"
+                : "bg-[#D4AF37] text-[#061A33] hover:bg-[#F0D895]"
+            }`}
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ActionButton({
