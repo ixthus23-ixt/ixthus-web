@@ -25,9 +25,11 @@ import {
   LogOut,
   MessageCircle,
   Pencil,
+  Search,
   Send,
   ShieldCheck,
   Users,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -48,6 +50,7 @@ import {
   getWhatsAppUrl,
   KERIGMA_COLLECTION,
   KERIGMA_COSTO,
+  normalizeSearchText,
   PARROQUIAS,
   SEXOS,
   type ContactStatus,
@@ -58,6 +61,7 @@ import {
 } from "@/lib/kerigma";
 
 type Filters = {
+  nameSearch: string;
   parroquia: "todos" | Parroquia;
   sexo: "todos" | Sexo;
   estadoPago: "todos" | EstadoPago;
@@ -67,6 +71,7 @@ type Filters = {
 type AdminTab = "registros" | "detalles" | "pagos";
 
 const initialFilters: Filters = {
+  nameSearch: "",
   parroquia: "todos",
   sexo: "todos",
   estadoPago: "todos",
@@ -191,7 +196,13 @@ export default function AdminKerigmaPage() {
   }, [isAdmin, user]);
 
   const filteredRegistrations = useMemo(() => {
+    const normalizedNameSearch = normalizeSearchText(filters.nameSearch);
+
     return registrations.filter((registration) => {
+      const normalizedName = normalizeSearchText(registration.nombre);
+      const nameMatch =
+        normalizedNameSearch.length === 0 ||
+        normalizedName.includes(normalizedNameSearch);
       const parishMatch =
         filters.parroquia === "todos" ||
         registration.parroquia === filters.parroquia;
@@ -204,7 +215,9 @@ export default function AdminKerigmaPage() {
         filters.contactStatus === "todos" ||
         getContactStatus(registration) === filters.contactStatus;
 
-      return parishMatch && sexMatch && paymentMatch && contactMatch;
+      return (
+        nameMatch && parishMatch && sexMatch && paymentMatch && contactMatch
+      );
     });
   }, [filters, registrations]);
 
@@ -623,16 +636,40 @@ function RecordsTab({
           <div>
             <h2 className="text-2xl font-black text-white">Registros</h2>
             <p className="mt-1 text-sm leading-6 text-blue-100/78">
-              Filtra por comunidad, sexo, estado de pago y contacto para
-              coordinar el seguimiento después de misa.
+              Busca por nombre y combina filtros por comunidad, sexo, pago y
+              contacto para coordinar el seguimiento después de misa.
             </p>
           </div>
-          <span className="w-fit rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-bold text-blue-100">
-            {filteredRegistrations.length} visibles
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFilters(initialFilters)}
+              className="rounded-full border border-white/12 px-3 py-1.5 text-sm font-bold text-blue-100 transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+            >
+              Limpiar filtros
+            </button>
+            <span className="w-fit rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-bold text-blue-100">
+              {filteredRegistrations.length} visibles
+            </span>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <NameSearchFilter
+            value={filters.nameSearch}
+            onChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                nameSearch: value,
+              }))
+            }
+            onClear={() =>
+              setFilters((current) => ({
+                ...current,
+                nameSearch: "",
+              }))
+            }
+          />
           <SelectFilter
             label="Parroquia"
             value={filters.parroquia}
@@ -684,6 +721,17 @@ function RecordsTab({
             <Loader2 className="h-5 w-5 animate-spin" />
             Cargando registros
           </div>
+        ) : filteredRegistrations.length === 0 ? (
+          <EmptyRegistrationsState
+            hasSearch={normalizeSearchText(filters.nameSearch).length > 0}
+            onClearSearch={() =>
+              setFilters((current) => ({
+                ...current,
+                nameSearch: "",
+              }))
+            }
+            onResetFilters={() => setFilters(initialFilters)}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1660px] border-separate border-spacing-0 text-left text-sm">
@@ -1130,6 +1178,46 @@ function SelectFilter({
   );
 }
 
+function NameSearchFilter({
+  value,
+  onChange,
+  onClear,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <label className="grid gap-2 md:col-span-2 xl:col-span-1">
+      <span className="text-sm font-bold text-blue-50">Buscar inscripción</span>
+      <span className="relative block">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-100/62"
+        />
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label="Buscar inscripción por nombre"
+          placeholder="Buscar por nombre..."
+          className="field-input"
+          style={{ paddingLeft: "2.75rem", paddingRight: "3rem" }}
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Limpiar búsqueda por nombre"
+            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-blue-100/72 transition hover:bg-white/10 hover:text-[#D4AF37]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
 function ContactStatusFilter({
   value,
   onChange,
@@ -1152,6 +1240,51 @@ function ContactStatusFilter({
         <option value="contacted">Contactados</option>
       </select>
     </label>
+  );
+}
+
+function EmptyRegistrationsState({
+  hasSearch,
+  onClearSearch,
+  onResetFilters,
+}: {
+  hasSearch: boolean;
+  onClearSearch: () => void;
+  onResetFilters: () => void;
+}) {
+  return (
+    <div className="grid min-h-64 place-items-center p-8 text-center">
+      <div className="max-w-md">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/12 bg-white/[0.08] text-blue-100">
+          <Search aria-hidden="true" className="h-6 w-6" />
+        </div>
+        <h3 className="mt-5 text-2xl font-black text-white">
+          No encontramos inscripciones que coincidan con tu búsqueda.
+        </h3>
+        <p className="mt-3 text-sm leading-6 text-blue-100/78">
+          Ajusta el nombre o restablece los filtros para volver a ver todos los
+          registros disponibles.
+        </p>
+        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          {hasSearch ? (
+            <button
+              type="button"
+              onClick={onClearSearch}
+              className="rounded-full border border-white/12 px-5 py-3 text-sm font-black text-blue-50 transition hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+            >
+              Limpiar búsqueda
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="rounded-full bg-[#D4AF37] px-5 py-3 text-sm font-black text-[#061A33] transition hover:bg-[#F0D895]"
+          >
+            Restablecer filtros
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
